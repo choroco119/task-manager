@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工程管理システム v2.33 | Distributed Architecture</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- 外部スタイルシート -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <header>
+        <div class="logo">PROCESS MANAGER v2.33</div>
+        <div class="controls">
+            <button class="btn btn-success" onclick="app.exportData()">データを出力</button>
+            <button class="btn" onclick="app.importData()">データを読み込み</button>
+            <div style="width:1px; height:24px; background:var(--border-color); margin:0 5px;"></div>
+            <button class="btn btn-primary" onclick="app.showMemberMng()">メンバー管理</button>
+            <button class="btn btn-primary" onclick="app.showProjectMng()">製番リスト (別窓)</button>
+        </div>
+    </header>
+
+    <div class="tabs" id="teamTabs"></div>
+
+    <main>
+        <div class="app-main-layout">
+            <div class="scheduler-card">
+                <div class="week-nav">
+                    <button class="btn" onclick="app.moveWeek(-1)">前週</button>
+                    <div class="week-text" id="weekRange">...</div>
+                    <button class="btn" onclick="app.moveWeek(1)">次週</button>
+                </div>
+                <div class="grid-container" id="grid"></div>
+            </div>
+
+            <!-- 詳細情報パネル (v2.38) -->
+            <div id="detailPanel" class="detail-panel">
+                <div class="detail-empty">
+                    <div style="font-size:2rem; opacity:0.3; margin-bottom:1rem;">ℹ️</div>
+                    工程バーをマウスオーバーすると<br>詳細情報が表示されます
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 製番リストビュー (別窓/パラメタ用) -->
+    <div class="pj-view" id="pjView">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+            <div>
+                <h2 style="color:var(--accent-color); font-size:1.5rem;">製番・案件リスト管理</h2>
+                <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:4px;">Excel表からの貼り付けや、案件の個別選択が可能です
+                </div>
+            </div>
+            <div class="controls">
+                <button class="btn" onclick="window.close()">画面を閉じる</button>
+            </div>
+        </div>
+        <div class="paste-area" onclick="document.getElementById('pasteInp').focus()">
+            <div style="font-size:1.1rem; font-weight:800;">Excel表をここに貼り付け (Ctrl+V)</div>
+            <div style="font-size:0.8rem; opacity:0.7; margin-top:4px;">指令書No / 客先 / / 製品名 ... の形式に対応</div>
+            <textarea id="pasteInp" onpaste="app.handlePaste(event)"></textarea>
+        </div>
+
+        <!-- マルチフィルタ・コンソール (v2.41) -->
+        <div class="pj-search-bar">
+            <div class="filter-item">
+                <label>指令書No</label>
+                <input type="text" placeholder="検索..." oninput="app.handlePjFilter('jobNo', this.value)">
+            </div>
+            <div class="filter-item">
+                <label>客先</label>
+                <input type="text" placeholder="検索..." oninput="app.handlePjFilter('customer', this.value)">
+            </div>
+            <div class="filter-item">
+                <label>製品名</label>
+                <input type="text" placeholder="検索..." oninput="app.handlePjFilter('name', this.value)">
+            </div>
+            <div class="filter-item">
+                <label>チーム</label>
+                <select id="fltTeam" onchange="app.handlePjFilter('team', this.value)"></select>
+            </div>
+            <div class="filter-item">
+                <label>担当者</label>
+                <select id="fltPerson" onchange="app.handlePjFilter('person', this.value)"></select>
+            </div>
+            <div id="pjCount" class="pj-count">全 0 件</div>
+        </div>
+
+        <div class="table-container" id="projectBody"></div>
+    </div>
+
+    <!-- 工程割り当てモーダル -->
+    <div class="overlay" id="assignModal">
+        <div class="modal modal-tight">
+            <div style="margin-bottom:1.25rem; border-bottom:1px solid var(--border-color); padding-bottom:1rem;">
+                <h3 id="targetStaff" style="font-size:1.2rem; color:var(--accent-color);">工程割り当て</h3>
+            </div>
+
+            <div class="form-g">
+                <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:0.5rem;">
+                    <label style="margin-bottom:0;">1. 製番・案件を選択</label>
+                    <span id="pjSignalTip"
+                        style="font-size:0.75rem; color:var(--accent-color); cursor:pointer; font-weight:700;"
+                        onclick="app.showProjectMng()">別窓リストから選ぶ ↗</span>
+                </div>
+                <select id="pSel" style="height:46px;"></select>
+            </div>
+
+            <div
+                style="background:rgba(255,255,255,0.03); padding:1.25rem; border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                <label style="margin-bottom:0.75rem;">2. 割り当て期間（曜日）</label>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div><label>開始曜日</label><select id="dayS">
+                            <option value="0">月曜日</option>
+                            <option value="1">火曜日</option>
+                            <option value="2">水曜日</option>
+                            <option value="3">木曜日</option>
+                            <option value="4">金曜日</option>
+                            <option value="5">土曜日</option>
+                            <option value="6">日曜日</option>
+                        </select></div>
+                    <div><label>終了曜日</label><select id="dayE">
+                            <option value="0">月曜日</option>
+                            <option value="1">火曜日</option>
+                            <option value="2">水曜日</option>
+                            <option value="3">木曜日</option>
+                            <option value="4">金曜日</option>
+                            <option value="5">土曜日</option>
+                            <option value="6">日曜日</option>
+                        </select></div>
+                </div>
+            </div>
+
+            <div class="m-footer">
+                <button class="btn btn-danger" id="delBtn" onclick="app.delSchedule()">削除</button>
+                <div style="flex:1"></div>
+                <button class="btn" onclick="app.hideModal('assignModal')">キャンセル</button>
+                <button class="btn btn-primary" onclick="app.saveSchedule()">確定して保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- メンバー管理モーダル -->
+    <div class="overlay" id="memberModal">
+        <div class="modal modal-lg">
+            <h3>メンバー管理</h3>
+            <div class="m-tabs">
+                <div class="m-tab" id="mtb-s" onclick="app.switchMemberTab('staff')">メンバー設定</div>
+                <div class="m-tab" id="mtb-t" onclick="app.switchMemberTab('team')">チーム設定</div>
+            </div>
+            <div id="memberBody" style="overflow-y:auto; flex:1;"></div>
+            <div class="m-footer">
+                <button class="btn btn-primary" onclick="app.hideModal('memberModal')">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 外部スクリプト -->
+    <script src="app.js"></script>
+</body>
+
+</html>
