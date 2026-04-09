@@ -685,6 +685,14 @@ const app = {
             this.render();
         }
     },
+    movePj(idx, dir) {
+        const n = idx + dir;
+        if (n >= 0 && n < this.state.projects.length) {
+            [this.state.projects[idx], this.state.projects[n]] = [this.state.projects[n], this.state.projects[idx]];
+            this.render(); // 保存と再描画
+            this.renderProjectBody();
+        }
+    },
 
     // --- 製番管理 ---
     handlePjFilter(key, val) {
@@ -742,12 +750,14 @@ const app = {
             return matchJob && matchCust && matchName && matchTeam && matchPers;
         });
 
+        const isFiltered = Object.values(this.pjFilters).some(v => v !== '');
+
         // 件数更新
         if (countEl) countEl.innerText = `ヒット: ${filtered.length} / 全 ${this.state.projects.length} 件`;
 
         // 全項目のヘッダー定義 (v2.45)
-        const hs = ['No.', '指令書No.', '客先', '向先', '製品名', 'チーム', '担当者', '数量', '納期', '工数', '備考'];
-        const cols = ['col-no', 'col-job', 'col-customer', 'col-dest', 'col-name', 'col-team', 'col-person', 'col-qty', 'col-date', 'col-mh', 'col-notes'];
+        const hs = ['順序', 'No.', '指令書No.', '客先', '向先', '製品名', 'チーム', '担当者', '数量', '納期', '工数', '備考'];
+        const cols = ['col-order', 'col-no', 'col-job', 'col-customer', 'col-dest', 'col-name', 'col-team', 'col-person', 'col-qty', 'col-date', 'col-mh', 'col-notes'];
 
         b.innerHTML = `
             <table class="m-table">
@@ -767,6 +777,14 @@ const app = {
                         <tr>
                             <td class="col-color-indicator" style="background:${this.esc(p.color)}"></td>
                             <td class="col-sel"><button class="btn btn-select btn-icon" onclick="app.selectSelf('${this.esc(p.id)}')">選択</button></td>
+                            <td class="col-order">
+                                ${!isFiltered ? `
+                                    <div style="display:flex;gap:4px;justify-content:center;">
+                                        <button class="btn btn-icon" onclick="app.movePj(${this.state.projects.indexOf(p)}, -1)">▲</button>
+                                        <button class="btn btn-icon" onclick="app.movePj(${this.state.projects.indexOf(p)}, 1)">▼</button>
+                                    </div>
+                                ` : '<span style="opacity:0.3">-</span>'}
+                            </td>
                             <td class="col-no">${this.esc(p.no)}</td>
                             <td class="col-job"><textarea class="edit-field" rows="1" oninput="app.adjustTextareaSize(this)" onchange="app.upPj('${this.esc(p.id)}', 'jobNo', this.value)">${this.esc(p.jobNo) || ''}</textarea></td>
                             <td class="col-customer"><textarea class="edit-field" rows="1" oninput="app.adjustTextareaSize(this)" onchange="app.upPj('${this.esc(p.id)}', 'customer', this.value)">${this.esc(p.customer) || ''}</textarea></td>

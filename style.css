@@ -566,6 +566,7 @@ select:focus, input:focus {
 /* --- 製番リストの列幅最適化 (FHD Scrollless / v2.99: 最小幅を強制) --- */
 .col-color-indicator { width: 8px; min-width: 8px; }
 .col-sel { width: 75px; min-width: 75px; }
+.col-order { width: 80px; min-width: 80px; }
 .col-no { width: 50px; min-width: 50px; }
 .col-job { width: 160px; min-width: 160px; }
 .col-customer { width: 200px; min-width: 180px; }
@@ -694,6 +695,7 @@ select:focus, input:focus {
 /* --- Column Width Optimization (v2.55: Max Visibility) --- */
 .col-color-indicator { width: 6px; min-width: 6px; padding: 0 !important; }
 .col-sel { text-align: center; }
+.col-order { text-align: center; }
 .col-no  { text-align: center; color: var(--text-secondary); }
 .col-job { font-weight: 700; } 
 .col-customer { }

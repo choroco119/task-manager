@@ -1,0 +1,6 @@
+- [x] 工程入力ワークフローの改善（製番リスト直行）を実装する
+- [x] `app.js` に `pendingAssign` 状態管理を追加
+- [x] `showA` メソッドを新規入力時にリストを直で開くように修正
+- [x] `showProjectMng` を `screen.availWidth/Height` を使った全画面表示に修正
+- [x] `selectPjFromSub` に自動保存ロジックを追加
+- [x] 動作確認
