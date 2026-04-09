@@ -9,10 +9,11 @@
     --success-color: #10b981;
     --danger-color: #ef4444;
     --warning-color: #f59e0b;
+    --saturday-color: #3b82f6;
     --leader-color: #fbbf24;
-    --sidebar-width: 220px;
-    --row-height: 80px;
-    --col-width: 120px;
+    --sidebar-width: 240px;
+    --row-height: 120px;
+    --col-width: 1fr;
 }
 
 /* --- Base Styles --- */
@@ -57,13 +58,13 @@ header {
 }
 
 .btn {
-    padding: 0.6rem 1.2rem;
-    border-radius: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.6rem;
     border: 1px solid var(--border-color);
     background: var(--surface-color);
     color: white;
     cursor: pointer;
-    font-size: 0.85rem;
+    font-size: 0.95rem; 
     font-weight: 600;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     white-space: nowrap;
@@ -78,6 +79,20 @@ header {
 .btn-primary { background: var(--accent-color); border: none; }
 .btn-success { background: var(--success-color); border: none; }
 .btn-danger { color: var(--danger-color); border-color: var(--danger-color); }
+
+.drop-hint {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.03);
+    padding: 0.6rem 1.25rem;
+    border-radius: 8px;
+    border: 1px dashed var(--border-color);
+    margin-left: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+}
 
 .tabs {
     padding: 0.4rem 2rem;
@@ -124,7 +139,8 @@ main {
 }
 
 .week-nav {
-    padding: 1.25rem;
+    padding: 1.5rem 2rem;
+    background: rgba(0,0,0,0.1);
     border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
@@ -133,15 +149,15 @@ main {
 
 .week-text {
     font-weight: 800;
-    min-width: 280px;
+    min-width: 320px;
     text-align: center;
-    font-size: 1.2rem;
+    font-size: 1.4rem;
     color: var(--text-primary);
 }
 
 .grid-container {
     display: grid;
-    grid-template-columns: var(--sidebar-width) repeat(7, var(--col-width));
+    grid-template-columns: var(--sidebar-width) repeat(7, 1fr) 100px;
 }
 
 .grid-header {
@@ -235,9 +251,9 @@ main {
     border-radius: 6px;
     pointer-events: auto;
     cursor: pointer; 
-    padding: 0 10px;
+    padding: 0 6px;
     font-size: 0.8rem;
-    font-weight: 800;
+    font-weight: 700;
     color: white;
     display: flex;
     align-items: center;
@@ -255,9 +271,9 @@ main {
     z-index: 20;
 }
 
-/* --- Detail Panel (v2.38) --- */
+/* --- Detail Panel --- */
 .detail-panel {
-    width: 320px;
+    width: 420px; 
     background: rgba(30, 41, 59, 0.7);
     backdrop-filter: blur(12px);
     border: 1px solid var(--border-color);
@@ -306,7 +322,7 @@ main {
 }
 
 .detail-title {
-    font-size: 1.2rem;
+    font-size: 1.5rem;
     font-weight: 800;
     color: var(--text-primary);
     line-height: 1.3;
@@ -332,9 +348,9 @@ main {
 }
 
 .detail-value {
-    font-size: 0.95rem;
+    font-size: 1.1rem;
     color: var(--text-primary);
-    line-height: 1.4;
+    line-height: 1.5;
     word-break: break-all;
 }
 
@@ -356,6 +372,11 @@ main {
     justify-content: center;
     align-items: center;
     z-index: 1000;
+}
+
+/* 製番リストモーダルは他のモーダルより前面に */
+#pjOverlay {
+    z-index: 1100;
 }
 
 .modal {
@@ -381,6 +402,15 @@ main {
     height: 80vh; /* 高さを固定してガタつきを防止 */
     display: flex;
     flex-direction: column;
+}
+
+.modal-full {
+    width: 100%;
+    height: 100%;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    border-radius: 0; /* 最大化時は角丸を解除 */
 }
 
 .modal-tight { padding: 1.75rem; }
@@ -449,18 +479,18 @@ select:focus, input:focus {
 }
 
 .edit-field {
-    background: transparent; /* 通常時は透過 (v2.47) */
+    background: transparent; 
     border: 1px solid transparent;
     padding: 0.5rem;
     border-radius: 4px;
     transition: all 0.2s;
-    white-space: pre; /* 自動折り返しを停止しデータに忠実な改行のみ表示 (v2.54) */
+    white-space: pre; /* 自動折り返しを停止しデータに忠実な改行のみ表示 */
     word-break: normal;
     font-family: inherit;
-    resize: none; /* 自動拡張されるため手動リサイズは無効化 (v2.48) */
+    resize: none; /* 自動拡張されるため手動リサイズは無効化 */
     color: var(--text-primary);
-    overflow: hidden; /* スクロールバーを出さずに拡張させる (v2.48) */
-    width: auto; /* 動的にJSで制御するため (v2.55) */
+    overflow: hidden; /* スクロールバーを出さずに拡張させる */
+    width: auto; /* 動的にJSで制御するため */
     display: inline-block;
 }
 
@@ -482,11 +512,11 @@ select:focus, input:focus {
 }
 
 .m-table {
-    width: auto; /* 内容に合わせて横に広がる (v2.55) */
-    min-width: 100%;
+    width: 100%;
+    min-width: max-content; /* 中身の最小幅を保障 */
     border-collapse: collapse;
     margin-top: 1rem;
-    table-layout: auto;
+    table-layout: auto; /* ブラウザの自動計算に任せて潰れを防止 */
 }
 
 .m-table td {
@@ -495,20 +525,26 @@ select:focus, input:focus {
     border-right: 1px solid rgba(255, 255, 255, 0.05);
     vertical-align: middle;
     transition: background 0.2s;
-    white-space: nowrap; /* 自動折り返しを完全に禁止 (v2.55) */
+    white-space: nowrap; 
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .m-table th {
+    position: sticky; /* ヘッダー固定 */
+    top: 0;
+    z-index: 10;
     text-align: left;
-    padding: 0.8rem 0.8rem;
+    padding: 1rem 0.8rem;
     color: var(--text-secondary);
-    font-size: 0.75rem;
-    font-weight: 700;
+    font-size: 0.85rem; 
+    font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 1px;
-    border-bottom: 1px solid var(--border-color);
-    border-right: 1px solid rgba(255, 255, 255, 0.05); /* ヘッダーにも区切り線 */
-    background: rgba(0,0,0,0.1);
+    border-bottom: 2px solid var(--accent-color);
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    background: var(--surface-color);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
 
 /* 最後の列からは区切り線を除去 */
@@ -516,40 +552,92 @@ select:focus, input:focus {
     border-right: none;
 }
 
-/* ゼブラストライプ (v2.47) */
+/* ゼブラストライプ */
 .m-table tbody tr:nth-child(even) {
     background: rgba(255, 255, 255, 0.015);
 }
 
-/* ホバー強調 (v2.47) */
+/* ホバー強調 */
 .m-table tbody tr:hover {
     background: rgba(99, 102, 241, 0.08) !important;
     box-shadow: inset 2px 0 0 var(--accent-color);
 }
 
-/* カラーインジケーター (v2.47) */
-.col-color-indicator {
-    width: 6px;
-    padding: 0 !important;
-    border: none !important;
+/* --- 製番リストの列幅最適化 (FHD Scrollless / v2.99: 最小幅を強制) --- */
+.col-color-indicator { width: 8px; min-width: 8px; }
+.col-sel { width: 75px; min-width: 75px; }
+.col-no { width: 50px; min-width: 50px; }
+.col-job { width: 160px; min-width: 160px; }
+.col-customer { width: 200px; min-width: 180px; }
+.col-dest { width: 200px; min-width: 180px; }
+.col-name { width: 300px; min-width: 250px; }
+.col-team { width: 260px; min-width: 260px; }  /* 最小幅を強制して潰れを防止 */
+.col-person { width: 260px; min-width: 260px; } /* 最小幅を強制して潰れを防止 */
+.col-qty { width: 85px; min-width: 80px; text-align: center; }
+.col-date { width: 115px; min-width: 110px; text-align: center; }
+.col-mh { width: 80px; min-width: 75px; text-align: center; }
+.col-notes { width: auto; min-width: 200px; }
+.col-opt { width: 65px; min-width: 60px; }
+
+.m-table .edit-field {
+    width: 100% !important;
+    min-width: 0 !important;
 }
 
-/* --- Project View (Sub-window) --- */
+.m-table select.edit-field {
+    padding: 0.4rem 0.5rem;
+    color: #ffffff !important;
+    background-color: #000000 !important; 
+    border: 1.5px solid var(--accent-color); 
+    font-size: 0.95rem; /* 読みやすさと情報量のバランス */
+    font-weight: 700;
+    appearance: auto;
+    cursor: pointer;
+}
+
+.m-table select.edit-field option {
+    background-color: #1e293b; /* 選択リスト内の背景 */
+    color: #ffffff;
+}
+
+/* --- Project View (Sub-window / Modal) --- */
 .pj-view {
     display: none;
     padding: 2rem;
-    background: var(--bg-color);
-    height: 100vh;
+    background: var(--surface-color); /* モーダル時はサーフェスカラー */
+    height: 100%;
     flex-direction: column;
+    border-radius: 16px;
 }
 
+/* 別ウィンドウ表示（bodyにpj-view-activeがある時）はBGカラーにし、全画面にする */
 .pj-view-active header, .pj-view-active .tabs, .pj-view-active main {
     display: none !important;
 }
 
-.pj-view-active .pj-view { display: flex; }
+/* 別窓表示時はオーバーレイの背景やフィルターを無効化して表示 */
+.pj-view-active #pjOverlay {
+    display: flex !important;
+    background: none;
+    backdrop-filter: none;
+}
 
-/* --- Project Search (v2.40/2.41) --- */
+.pj-view-active .pj-view {
+    display: flex;
+    background: var(--bg-color);
+    height: 100vh;
+    width: 100%;
+    max-width: none;
+    border-radius: 0;
+}
+
+/* モーダルとして表示（親のoverlayが表示されている時） */
+.overlay[style*="display: flex"] .pj-view,
+.overlay[style*="display:flex"] .pj-view {
+    display: flex;
+}
+
+/* --- Project Search --- */
 .pj-search-bar {
     margin: 1.25rem 0;
     display: flex;
@@ -612,7 +700,7 @@ select:focus, input:focus {
 .col-dest { }
 .col-name { } 
 .col-qty  { text-align: center; }
-.col-team, .col-person { width: 1%; white-space: nowrap; } /* 固定幅を廃止し、内容にフィット (v2.56) */
+.col-team, .col-person { width: 1%; white-space: nowrap; } /* 固定幅を廃止し、内容にフィット */
 .col-date { text-align: center; }
 .col-mh   { text-align: center; }
 .col-notes { } 
@@ -645,11 +733,11 @@ select:focus, input:focus {
 }
 
 .paste-area {
+    display: none; /* デフォルト（モーダル時）は非表示 */
     height: 80px;
     background: rgba(99, 102, 241, 0.05);
     border: 2px dashed var(--accent-color);
     border-radius: 12px;
-    display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
@@ -658,5 +746,133 @@ select:focus, input:focus {
     transition: 0.2s;
 }
 
+.pj-view-active .paste-area {
+    display: flex;
+}
+
 .paste-area:hover { background: rgba(99, 102, 241, 0.1); }
 .paste-area textarea { position: absolute; opacity: 0; pointer-events: none; }
+
+/* --- Drag & Drop Overlay (v2.60) --- */
+.drop-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(12px);
+    z-index: 5000;
+    display: none; /* JSで制御 */
+    justify-content: center;
+    align-items: center;
+    border: 4px dashed var(--accent-color);
+    margin: 20px;
+    border-radius: 24px;
+    pointer-events: none; /* 貫通させる */
+}
+
+.drop-overlay.active {
+    display: flex;
+    animation: fadeIn 0.3s ease;
+}
+
+.drop-message {
+    text-align: center;
+    color: white;
+    transform: translateY(0);
+    animation: bounceIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes bounceIn {
+    from { opacity: 0; transform: scale(0.8) translateY(20px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* --- Stats Area (v2.90) --- */
+.stats-area {
+    margin-top: 1.5rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.25rem;
+    padding-bottom: 2rem;
+}
+
+.stats-card {
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1.25rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    border-top: 4px solid var(--accent-color);
+}
+
+.stats-team-name {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.stats-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.stats-label {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+
+.stats-value {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--accent-color);
+}
+
+.grid-total-header {
+    background: rgba(99, 102, 241, 0.1) !important;
+    font-weight: 800;
+    color: var(--accent-color) !important;
+}
+
+.grid-total-cell {
+    grid-column: 9;
+    border-left: 2px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.02);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    color: var(--accent-color);
+    font-size: 1.1rem;
+}
+
+/* --- Assign Hint (v2.95) --- */
+.assign-hint {
+    background: var(--accent-color);
+    color: white;
+    padding: 1rem 2rem;
+    display: none; /* JSで制御 */
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    font-weight: 700;
+    box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4);
+    animation: slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
