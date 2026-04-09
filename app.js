@@ -73,6 +73,13 @@ const app = {
         localStorage.setItem('scheduler_app_state', JSON.stringify(this.state));
     },
 
+    clearAllData() {
+        if (confirm('ブラウザ内に保存されているすべてのデータを削除しますか？\n（案件、スケジュール、メンバー情報がすべて消去されます。この操作は取り消せません）')) {
+            localStorage.removeItem('scheduler_app_state');
+            location.reload();
+        }
+    },
+
     loadConfig() {
         const conf = localStorage.getItem('scheduler_app_state');
         if (conf) {
@@ -517,11 +524,11 @@ const app = {
             if (hint && hintText) {
                 hintText.innerText = `製番 [${pj?.jobNo || pid}] を割り当てるセルを選択してください`;
                 hint.style.display = 'flex';
-                
+
                 // メイン画面を手前に引き寄せる
-                try { window.focus(); } catch(e) {}
+                try { window.focus(); } catch (e) { }
             }
-            
+
             // リストを閉じる (自身のウィンドウがサブウィンドウなら)
             this.hidePjModal();
             return;
@@ -715,7 +722,7 @@ const app = {
             const maxLen = Math.max(...lines.map(l => {
                 let len = 0;
                 for (let i = 0; i < l.length; i++) {
-                    len += l.charCodeAt(i) > 255 ? 2 : 1; 
+                    len += l.charCodeAt(i) > 255 ? 2 : 1;
                 }
                 return len;
             }), 0);

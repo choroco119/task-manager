@@ -79,6 +79,7 @@ header {
 .btn-primary { background: var(--accent-color); border: none; }
 .btn-success { background: var(--success-color); border: none; }
 .btn-danger { color: var(--danger-color); border-color: var(--danger-color); }
+.btn-danger:hover { background: var(--danger-color); color: white; border-color: var(--danger-color); }
 
 .drop-hint {
     font-size: 0.85rem;
