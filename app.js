@@ -4,13 +4,17 @@ const app = {
         team: 'all',
         teams: [],
         staff: [],
+        tags: [],
         projects: [],
-        schedule: []
+        deletedProjects: [],
+        specialItems: [],
+        schedule: [],
+        holidays: []
     },
     isPjMode: false,
     activeEid: null,
     activeSid: null,
-    pjFilters: { jobNo: '', customer: '', name: '', team: '', person: '' }, // 複数項目フィルタ
+    pjFilters: { jobNo: '', customer: '', name: '', team: '', person: '', tagId: '' }, // 複数項目フィルタ
     pendingAssign: null, // 新規入力時のコンテキスト保持
     pendingPid: null,    // 製番先行選択時のID保持
 
@@ -23,6 +27,20 @@ const app = {
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    },
+
+    // ファイルドロップかどうかを判定する共通関数
+    isFileDrag(e) {
+        if (!e.dataTransfer) return false;
+        // ドラッグ終了後や一部ブラウザでは dataTransfer.files が空になることがあるため types も併用
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) return true;
+        if (e.dataTransfer.types) {
+            for (let i = 0; i < e.dataTransfer.types.length; i++) {
+                const t = e.dataTransfer.types[i].toLowerCase();
+                if (t === 'files' || t === 'application/x-moz-file') return true;
+            }
+        }
+        return false;
     },
 
     // 工数解析ヘルパー 
@@ -66,6 +84,9 @@ const app = {
                 this.selectPjFromSub(e.newValue);
             }
         });
+
+        // 右クリックメニューの無効化 (v3.25)
+        window.addEventListener('contextmenu', e => e.preventDefault());
     },
 
     saveConfig() {
@@ -96,10 +117,37 @@ const app = {
         if (!this.state.teams) this.state.teams = [];
         if (!this.state.staff) this.state.staff = [];
         if (!this.state.projects) this.state.projects = [];
+        if (!this.state.deletedProjects) this.state.deletedProjects = [];
+        if (!this.state.tags) this.state.tags = [];
         if (!this.state.schedule) this.state.schedule = [];
+        if (!this.state.holidays) this.state.holidays = [];
+        if (!this.state.specialItems) {
+            this.state.specialItems = [
+                { id: 'si1', name: '休暇', order: 0 },
+                { id: 'si2', name: '出張', order: 1 },
+                { id: 'si3', name: '会議', order: 2 },
+                { id: 'si4', name: '欠勤', order: 3 }
+            ];
+        }
+
+        // 旧形式（日付文字列）のクリーンアップ (v3.20)
+        if (this.state.holidays.some(h => typeof h === 'string' && h.includes('-'))) {
+            this.state.holidays = [];
+        }
+
+        // スケジュールの整合性チェック (v3.26)
+        this.state.schedule = this.state.schedule.filter(item => {
+            // プロジェクトIDがあるが実在しない場合は特別項目（旧データ救済）として扱うか、
+            // 空文字などの不正なIDをクリーンアップ
+            if (item.projectId === "" || item.projectId === "null") {
+                item.projectId = null;
+            }
+            return true;
+        });
 
         const teamIds = new Set(this.state.teams.map(t => t.id));
         const staffIds = new Set(this.state.staff.map(s => s.id));
+        const tagIds = new Set(this.state.tags.map(t => t.id));
         const pjIds = new Set(this.state.projects.map(p => p.id));
 
         // 整合性チェック: IDが消えた予定を削除
@@ -115,9 +163,15 @@ const app = {
                 const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6'];
                 p.color = colors[idx % colors.length];
             }
+            if (p.tagId && !tagIds.has(p.tagId)) p.tagId = '';
         });
 
-        this.state.schedule = this.state.schedule.filter(l => staffIds.has(l.staffId) && pjIds.has(l.projectId));
+        this.state.schedule = this.state.schedule.filter(l => {
+            const hasStaff = staffIds.has(l.staffId);
+            const isProjectValid = pjIds.has(l.projectId);
+            const isSpecialValid = !l.projectId && !!l.specialTitle;
+            return hasStaff && (isProjectValid || isSpecialValid);
+        });
     },
 
     setInitialWeek() {
@@ -131,6 +185,7 @@ const app = {
 
     render() {
         this.saveConfig();
+        this.renderMenuBadges(); // 特別項目バッジの描画
         if (this.isPjMode) {
             this.renderProjectBody();
             return;
@@ -206,6 +261,16 @@ const app = {
         if (el) el.textContent = `${fmt(mon)} - ${fmt(sun)}`;
     },
 
+    toggleHoliday(dayIdx) {
+        const idx = this.state.holidays.indexOf(dayIdx);
+        if (idx === -1) {
+            this.state.holidays.push(dayIdx);
+        } else {
+            this.state.holidays.splice(idx, 1);
+        }
+        this.render();
+    },
+
     setT(id) {
         this.state.team = id;
         this.render();
@@ -227,11 +292,19 @@ const app = {
         for (let i = 0; i < 7; i++) {
             const d = new Date(mon);
             d.setDate(mon.getDate() + i);
+            const isHoliday = this.state.holidays.includes(i);
             const isToday = new Date().toDateString() === d.toDateString();
+            
             h += `
-                <div class="grid-header" style="${isToday ? 'background:rgba(99,102,241,0.1)' : ''}">
+                <div class="grid-header ${isHoliday ? 'is-holiday' : ''}" 
+                     style="${isToday ? 'background:rgba(99,102,241,0.1)' : ''}; cursor:pointer;" 
+                     onclick="app.toggleHoliday(${i})" 
+                     title="クリックで休日を切り替え">
                     <b>${['月', '火', '水', '木', '金', '土', '日'][i]}</b>
-                    <span style="color:${i === 5 ? 'var(--saturday-color)' : (i === 6 ? 'var(--danger-color)' : 'var(--text-secondary)')}">${d.getMonth() + 1}/${d.getDate()}</span>
+                    <span style="color:${isHoliday ? 'white' : (i === 5 ? 'var(--saturday-color)' : (i === 6 ? 'var(--danger-color)' : 'var(--text-secondary)'))}">
+                        ${d.getMonth() + 1}/${d.getDate()}
+                    </span>
+                    ${isHoliday ? '<div class="holiday-label">休日</div>' : ''}
                 </div>`;
         }
         h += `<div class="grid-header grid-total-header">合計工数</div>`;
@@ -244,12 +317,21 @@ const app = {
         list.forEach(s => {
             const teamName = this.state.teams.find(t => t.id === s.teamId)?.name || '未所属';
 
+            const sIdStr = String(s.id);
             // この週の工数を算出 
-            const staffTasks = this.state.schedule.filter(l => l.staffId === s.id);
-            const totalH = staffTasks.reduce((sum, t) => {
-                const pj = this.state.projects.find(p => p.id === t.projectId);
-                return sum + this.parseManHours(pj?.manHours);
-            }, 0);
+            const staffTasks = this.state.schedule.filter(l => String(l.staffId) === sIdStr);
+            const uniquePjIds = new Set();
+            let totalH = 0;
+            staffTasks.forEach(t => {
+                const tPjId = String(t.projectId);
+                if (tPjId && tPjId !== "null" && tPjId !== "undefined" && tPjId !== "") {
+                    if (!uniquePjIds.has(tPjId)) {
+                        uniquePjIds.add(tPjId);
+                        const pj = this.state.projects.find(p => String(p.id) === tPjId);
+                        totalH += this.parseManHours(pj?.manHours);
+                    }
+                }
+            });
 
             h += `
                 <div class="grid-row">
@@ -259,13 +341,24 @@ const app = {
                     </div>
                     <div class="content-area" id="content-${s.id}">
                         <div class="click-grid">
-                            ${[0, 1, 2, 3, 4, 5, 6].map(i => `<div class="click-cell" onclick="app.showA(${i}, '${s.id}')"></div>`).join('')}
+                            ${[0, 1, 2, 3, 4, 5, 6].map(i => {
+                                const hol = this.state.holidays.includes(i);
+                                return `<div class="click-cell ${hol ? 'is-holiday' : ''}" 
+                                             data-day="${i}" data-staff="${s.id}"
+                                             onclick="app.showA(${i}, '${s.id}')"
+                                             oncontextmenu="app.showA(${i}, '${s.id}', null, null, event)"
+                                             ondragover="app.handleDragOver(event)"
+                                             ondragenter="app.handleDragEnter(event, this)"
+                                             ondragleave="app.handleDragLeave(event, this)"
+                                             ondrop="app.handleDrop(event, ${i}, '${s.id}')"></div>`;
+                            }).join('')}
                         </div>
                         <div class="bars-layer" id="bars-${s.id}"></div>
                     </div>
                     <div class="grid-total-cell">${totalH}h</div>
                 </div>`;
         });
+
 
         el.innerHTML = h;
         list.forEach(s => this.drawBars(s.id));
@@ -275,12 +368,15 @@ const app = {
         const layer = document.getElementById(`bars-${sid}`);
         if (!layer) return;
 
-        const tasks = this.state.schedule.filter(l => l.staffId === sid);
+        const sidStr = String(sid);
+        const tasks = this.state.schedule.filter(l => String(l.staffId) === sidStr);
+        console.log(`[Debug] drawBars: sid=${sidStr}, foundTasks=${tasks.length}`);
+        
         const stacks = [];
         let maxLv = 0;
 
-        tasks.sort((a, b) => a.startIdx - b.startIdx).forEach(task => {
-            // 重なり判定 (スタッキングロジック)
+        tasks.sort((a, b) => (Number(a.startIdx) || 0) - (Number(b.startIdx) || 0)).forEach(task => {
+            // 重なり判定
             let lv = 0;
             while (true) {
                 if (!stacks[lv]) stacks[lv] = [];
@@ -293,40 +389,91 @@ const app = {
                 lv++;
             }
 
-            const pj = this.state.projects.find(p => p.id === task.projectId);
-            if (!pj) return;
+            const pjId = task.projectId || null;
+            const pj = (pjId && pjId !== '') ? this.state.projects.find(p => p.id === pjId) : null;
+            
+            // 特別項目の背景色
+            const color = pj ? (pj.color || '#6366f1') : '#6b7280'; // プロジェクトなら設定色、特別ならグレー
+            const tag = pj && pj.tagId ? this.state.tags.find(t => t.id === pj.tagId) : null;
+            const tagName = tag ? tag.name : '';
+            
+            // 特記タイトル（プロジェクトがない場合は specialTitle を優先表示）
+            let title = '';
+            if (pj) {
+                // ご要望：No.（リスト上の順番）、製品名、タグ（タグは後続のHTMLで付与される）
+                title = `${pj.no || '---'} / ${pj.name || '無題'}`;
+            } else {
+                title = `★ ${task.specialTitle || '予定なし'}`;
+            }
 
-            const b = document.createElement('div');
-            b.className = 'bar';
-            const left = (task.startIdx / 7) * 100;
-            const width = ((task.endIdx - task.startIdx + 1) / 7) * 100;
+            const bar = document.createElement('div');
+            bar.className = 'bar' + (pj ? '' : ' bar-special');
+            
+            const start = Number(task.startIdx) || 0;
+            const end = Number(task.endIdx) || 0;
+            
+            bar.style.left = `calc(${(start / 7) * 100}% + 2px)`;
+            bar.style.width = `calc(${((end - start + 1) / 7) * 100}% - 4px)`;
+            bar.style.top = `${lv * 35 + 8}px`;
+            bar.style.backgroundColor = color;
+            bar.style.pointerEvents = 'auto'; // 確実にマウス反応させる
 
-            b.style.left = `calc(${left}% + 4px)`;
-            b.style.width = `calc(${width}% - 8px)`;
-            b.style.top = `${lv * 32 + 8}px`; // 縦に並べる
-            b.style.backgroundColor = pj.color;
-            b.innerHTML = `<span style="font-size:0.75rem;opacity:0.8;margin-right:4px;">#${this.esc(pj.no)}</span> <b style="font-size:0.85rem;">${this.esc(pj.jobNo)}</b><span style="opacity:0.6;margin-left:4px;">: ${this.esc(pj.name)}</span>`;
-            b.title = `指令No: ${pj.jobNo}\n客先: ${pj.customer}\n納期: ${pj.deadline}`;
+            bar.innerHTML = this.esc(title);
+            if (tagName) {
+                bar.innerHTML += ` <span style="font-size:0.6rem; opacity:0.8; background:rgba(0,0,0,0.2); padding:1px 4px; border-radius:3px; margin-left:4px;">${this.esc(tagName)}</span>`;
+            }
 
-            b.onclick = (e) => {
+            // --- Drag & Drop 処理 ---
+            bar.draggable = true;
+            bar.ondragstart = (e) => {
                 e.stopPropagation();
-                app.showA(task.startIdx, null, task.id);
+                this.clearPjDetail();
+                const duration = end - start;
+                e.dataTransfer.setData('text/plain', JSON.stringify({
+                    id: task.id,
+                    duration: duration,
+                    originalStaff: sidStr
+                }));
+                e.dataTransfer.effectAllowed = 'move';
+                setTimeout(() => { bar.style.opacity = '0.5'; }, 0);
+            };
+            bar.ondragend = (e) => {
+                bar.style.opacity = '1';
+                document.querySelectorAll('.click-cell').forEach(c => {
+                    c.style.backgroundColor = ''; // クリーンアップ 
+                });
             };
 
-            // ホバー連動
-            b.onmouseenter = () => this.showPjDetail(pj.id);
+            bar.onclick = (e) => {
+                e.stopPropagation();
+                this.showA(start, sid, task.id);
+            };
+            
+            bar.onmouseover = () => pj ? this.showPjDetail(pj.id) : this.showSpecialDetail(task);
+            // ご要望：他のバーに乗るまで詳細表示を維持するため onmouseout を削除
 
-            layer.appendChild(b);
+            // リサイズハンドルの追加
+            const leftHandle = document.createElement('div');
+            leftHandle.className = 'resize-handle left';
+            leftHandle.onmousedown = (e) => this.startBarResize(e, task.id, 'left');
+            
+            const rightHandle = document.createElement('div');
+            rightHandle.className = 'resize-handle right';
+            rightHandle.onmousedown = (e) => this.startBarResize(e, task.id, 'right');
+
+            bar.appendChild(leftHandle);
+            bar.appendChild(rightHandle);
+
+            layer.appendChild(bar);
         });
 
         // 行の高さを段数に合わせて動的に拡張 
-        const finalHeight = Math.max(120, (maxLv + 2) * 32 + 16);
+        const finalHeight = Math.max(120, (maxLv + 1) * 35 + 24);
         const elSide = document.getElementById(`sidebar-${sid}`);
         const elCont = document.getElementById(`content-${sid}`);
         if (elSide) elSide.style.height = `${finalHeight}px`;
         if (elCont) elCont.style.height = `${finalHeight}px`;
     },
-
     // セル選択待ち状態の解除 
     clearPendingPid() {
         this.pendingPid = null;
@@ -334,9 +481,13 @@ const app = {
         if (hint) hint.style.display = 'none';
     },
 
-    showA(idx, sid, eid = null, pid = null) {
+    showA(idx, sid, eid = null, pid = null, event = null) {
+        if (event) {
+            event.preventDefault();
+        }
+        
         // 先行して製番が選ばれている場合 
-        if (this.pendingPid && !pid) {
+        if (this.pendingPid && !pid && !event) {
             const selectedPid = this.pendingPid;
             this.clearPendingPid();
             this.showA(idx, sid, null, selectedPid);
@@ -345,9 +496,10 @@ const app = {
 
         this.activeEid = eid;
         this.activeSid = sid;
+        this.activeAssignTab = 'project'; // 初期設定を強制 
 
-        // 新規入力時、まだ製番が決まっていないならリストを表示 
-        if (!eid && !pid) {
+        // 新規入力時、まだ製番が決まっていない且つ右クリックでないならリストを表示 
+        if (!eid && !pid && !event) {
             this.pendingAssign = { idx, sid };
             this.showPjModal();
             return;
@@ -356,24 +508,66 @@ const app = {
         this.pendingAssign = null;
         this.refreshPjSelect();
 
-        const sId = sid || (eid ? this.state.schedule.find(x => x.id === eid).staffId : '');
-        const staff = this.state.staff.find(s => s.id === sId);
-        document.getElementById('targetStaff').innerText = `対象: ${staff?.name || '---'}`;
+        const sidStr = String(sid);
+        const staff = this.state.staff.find(s => String(s.id) === sidStr);
+        document.getElementById('targetStaff').innerText = `${this.esc(staff?.name || '不明')} さんの予定設定`;
 
         if (eid) {
             const it = this.state.schedule.find(x => x.id === eid);
             document.getElementById('dayS').value = it.startIdx;
             document.getElementById('dayE').value = it.endIdx;
-            document.getElementById('pSel').value = it.projectId;
+            
+            if (it.projectId) {
+                this.switchAssignTab('project');
+                const sel = document.getElementById('pSel');
+                if (sel) sel.value = it.projectId;
+            } else {
+                this.switchAssignTab('special');
+                const titleInp = document.getElementById('sTitle');
+                if (titleInp) titleInp.value = it.specialTitle || '';
+            }
             document.getElementById('delBtn').style.display = 'block';
+            const elComp = document.getElementById('compBtn');
+            if (elComp) elComp.style.display = it.projectId ? 'block' : 'none';
         } else {
             document.getElementById('dayS').value = idx;
             document.getElementById('dayE').value = idx;
-            document.getElementById('pSel').value = pid || '';
+            const titleInp = document.getElementById('sTitle');
+            if (titleInp) titleInp.value = '';
+            
+            if (event && event.type === 'contextmenu') {
+                this.switchAssignTab('special');
+            } else {
+                this.switchAssignTab('project');
+                const sel = document.getElementById('pSel');
+                if (sel) sel.value = pid || '';
+            }
             document.getElementById('delBtn').style.display = 'none';
+            const elComp = document.getElementById('compBtn');
+            if (elComp) elComp.style.display = 'none';
         }
 
         document.getElementById('assignModal').style.display = 'flex';
+    },
+
+    switchAssignTab(mode) {
+        this.activeAssignTab = mode;
+        const pTab = document.getElementById('atb-p');
+        const sTab = document.getElementById('atb-s');
+        const pSec = document.getElementById('assign-p-sec');
+        const sSec = document.getElementById('assign-s-sec');
+        
+        if (mode === 'project') {
+            if (pTab) pTab.classList.add('active');
+            if (sTab) sTab.classList.remove('active');
+            if (pSec) pSec.style.display = 'block';
+            if (sSec) sSec.style.display = 'none';
+        } else {
+            if (pTab) pTab.classList.remove('active');
+            if (sTab) sTab.classList.add('active');
+            if (pSec) pSec.style.display = 'none';
+            if (sSec) sSec.style.display = 'block';
+        }
     },
 
     refreshPjSelect() {
@@ -387,7 +581,54 @@ const app = {
         el.value = currentVal;
     },
 
-    // --- 詳細パネル連動 ---
+    // --- 特別項目 CRUD ---
+    addSpecialItem() {
+        const title = document.getElementById('nsSI')?.value.trim();
+        if (!title) return;
+        this.state.specialItems.push({ id: 'si' + Date.now(), name: title, order: this.state.specialItems.length });
+        this.saveConfig();
+        this.renderMemberBody('specialItem');
+        this.renderMenuBadges(); // 予定設定の中身も可能なら直ちに再描画
+    },
+    upSpecialItemN(id, v) {
+        const item = this.state.specialItems.find(x => x.id === id);
+        if (item) { item.name = v.trim(); this.saveConfig(); this.renderMenuBadges(); }
+    },
+    delSpecialItem(id) {
+        if (!confirm('本当に削除しますか？')) return;
+        this.state.specialItems = this.state.specialItems.filter(x => x.id !== id);
+        this.saveConfig();
+        this.renderMemberBody('specialItem');
+        this.renderMenuBadges();
+    },
+    upSpecialItemOrder(id, dir) {
+        const list = this.state.specialItems;
+        list.sort((a, b) => a.order - b.order);
+        const idx = list.findIndex(x => x.id === id);
+        if (idx < 0) return;
+        const targetIdx = idx + dir;
+        if (targetIdx >= 0 && targetIdx < list.length) {
+            const temp = list[idx].order;
+            list[idx].order = list[targetIdx].order;
+            list[targetIdx].order = temp;
+            this.saveConfig();
+            this.renderMemberBody('specialItem');
+            this.renderMenuBadges();
+        }
+    },
+    
+    // --- 特別項目バッジの生成 ---
+    renderMenuBadges() {
+        const container = document.getElementById('specialItemsContainer');
+        if (!container) return;
+        
+        const sorted = [...this.state.specialItems].sort((a, b) => a.order - b.order);
+        container.innerHTML = sorted.map(item => 
+            `<span class="tag-badge" style="cursor:pointer;" onclick="document.getElementById('sTitle').value='${this.esc(item.name)}'">${this.esc(item.name)}</span>`
+        ).join('');
+    },
+
+    // --- 各種フォーマッタ・ユーティリティ ---
     showPjDetail(pid) {
         const pj = this.state.projects.find(p => p.id === pid);
         const panel = document.getElementById('detailPanel');
@@ -396,10 +637,15 @@ const app = {
         const teamName = this.state.teams.find(t => t.id === pj.team)?.name || '未設定';
         const staffName = this.state.staff.find(s => s.id === pj.person)?.name || '未設定';
 
+        const pjTag = this.state.tags.find(t => t.id === pj.tagId);
+
         panel.innerHTML = `
             <div class="detail-card">
                 <div class="detail-header">
-                    <div class="detail-no">Project No.${this.esc(pj.no)}</div>
+                    <div class="detail-no">
+                        <span>Project No.${this.esc(pj.no)}</span>
+                        ${pjTag ? `<span class="tag-badge">${this.esc(pjTag.name)}</span>` : ''}
+                    </div>
                     <div class="detail-title">${this.esc(pj.name)}</div>
                 </div>
                 <div class="detail-grid">
@@ -431,6 +677,22 @@ const app = {
             </div>`;
     },
 
+    showSpecialDetail(task) {
+        const panel = document.getElementById('detailPanel');
+        if (!panel) return;
+        panel.innerHTML = `
+            <div class="detail-card" style="border-left-color: #475569;">
+                <div class="detail-header">
+                    <div class="detail-no">特別項目 / 休暇・予定等</div>
+                    <div class="detail-title">${this.esc(task.specialTitle)}</div>
+                </div>
+                <div style="padding:1.5rem; opacity:0.8; font-size:0.9rem; line-height:1.6;">
+                    個人別に設定された特別な予定です。<br>
+                    休暇、出張、内部会議などの用途で利用可能です。
+                </div>
+            </div>`;
+    },
+
     clearPjDetail() {
         const panel = document.getElementById('detailPanel');
         if (panel) {
@@ -445,35 +707,210 @@ const app = {
     saveSchedule() {
         const s = parseInt(document.getElementById('dayS').value);
         const e = parseInt(document.getElementById('dayE').value);
-        const p = document.getElementById('pSel').value;
+        
+        let pId = "";
+        let sTitle = "";
 
-        if (!p) {
-            alert('製番を選択してください');
-            return;
+        // タブに応じたデータ取得 
+        if (this.activeAssignTab === 'project') {
+            pId = document.getElementById('pSel').value;
+            if (!pId) { alert('製番を選択してください'); return; }
+        } else {
+            sTitle = document.getElementById('sTitle').value.trim();
+            if (!sTitle) { alert('テキストを入力してください'); return; }
         }
+
+        const data = {
+            startIdx: s,
+            endIdx: e,
+            projectId: pId,
+            specialTitle: sTitle
+        };
 
         if (this.activeEid) {
             const item = this.state.schedule.find(sc => sc.id === this.activeEid);
-            Object.assign(item, { startIdx: s, endIdx: e, projectId: p });
+            if (item) Object.assign(item, data);
         } else {
             this.state.schedule.push({
                 id: 'sc' + Date.now(),
                 staffId: this.activeSid,
-                projectId: p,
-                startIdx: s,
-                endIdx: e
+                ...data
             });
         }
+        
+        console.log(`[Debug] Save Complete. Current schedule count: ${this.state.schedule.length}`);
+        this.saveConfig();
         this.hideModal('assignModal');
         this.render();
     },
 
     delSchedule() {
-        if (confirm('割当を削除しますか？')) {
+        if (confirm('割当を解除しますか？')) {
             this.state.schedule = this.state.schedule.filter(s => s.id !== this.activeEid);
             this.hideModal('assignModal');
+            this.saveConfig();
             this.render();
         }
+    },
+
+    completeSchedule() {
+        if (confirm('この割り当てを完了（解除）し、自動的に製番リストからも削除（ゴミ箱へ移動）しますか？')) {
+            const task = this.state.schedule.find(s => s.id === this.activeEid);
+            if (task && task.projectId) {
+                const pjIdx = this.state.projects.findIndex(p => p.id === task.projectId);
+                if (pjIdx >= 0) {
+                    const pj = this.state.projects.splice(pjIdx, 1)[0];
+                    pj.deletedAt = new Date().toLocaleString();
+                    this.state.deletedProjects.push(pj);
+                }
+            }
+            this.state.schedule = this.state.schedule.filter(s => s.id !== this.activeEid);
+            this.hideModal('assignModal');
+            this.saveConfig();
+            this.render();
+        }
+    },
+
+    // --- Drag & Drop 実装 ---
+    handleDragOver(e) {
+        if (this.isFileDrag(e)) return; // ファイルドロップ時は上位(window)の処理に任せる
+        e.preventDefault(); // ドロップを許可 
+        e.dataTransfer.dropEffect = 'move';
+    },
+
+    handleDragEnter(e, el) {
+        if (this.isFileDrag(e)) return; // ファイルドロップ時はハイライトしない
+        e.preventDefault();
+        el.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+    },
+
+    handleDragLeave(e, el) {
+        if (this.isFileDrag(e)) return;
+        el.style.backgroundColor = '';
+    },
+
+    handleDrop(e, dayIdx, staffId) {
+        if (this.isFileDrag(e)) return; // ファイルドロップ時は上位(window)の処理に任せるため stopPropagation しない
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // ハイライトの解除 
+        document.querySelectorAll('.click-cell').forEach(c => c.style.backgroundColor = '');
+
+        const dataStr = e.dataTransfer.getData('text/plain');
+        if (!dataStr) return;
+
+        try {
+            const data = JSON.parse(dataStr);
+            const task = this.state.schedule.find(t => t.id === data.id);
+            if (!task) return;
+
+            const oldStaff = task.staffId;
+            const oldStart = task.startIdx;
+
+            if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) {
+                // Ctrlキー等が押されている場合はコピーとして扱う
+                // (ブラウザ制約上、右クリックD＆Dが困難なため代替手段)
+                const newTask = { ...task, id: 'sc' + Date.now() };
+                newTask.staffId = staffId;
+                newTask.startIdx = dayIdx;
+                newTask.endIdx = dayIdx + data.duration;
+                if (newTask.endIdx > 6) newTask.endIdx = 6;
+                this.state.schedule.push(newTask);
+            } else {
+                // 通常の移動
+                task.staffId = staffId;
+                task.startIdx = dayIdx;
+                task.endIdx = dayIdx + data.duration;
+
+                // 週(0-6)をはみ出した場合は縮める (切り捨て方式)
+                if (task.endIdx > 6) {
+                    task.endIdx = 6;
+                }
+
+                // 同一セル内でのドロップ（位置が変わっていない場合）は並び順の入れ替え（最後尾へ移動）を行う
+                if (oldStaff === staffId && oldStart === dayIdx) {
+                    this.state.schedule = this.state.schedule.filter(t => t.id !== task.id);
+                    this.state.schedule.push(task);
+                }
+            }
+            
+            this.saveConfig();
+            this.render();
+        } catch (err) {
+            console.error("Drop Parse Error:", err);
+        }
+    },
+
+    // --- バーのリサイズ (期間延長・短縮) 実装 ---
+    startBarResize(e, taskId, edge) {
+        e.preventDefault();
+        e.stopPropagation(); // ドラッグ移動やクリックを防止
+
+        const task = this.state.schedule.find(t => t.id === taskId);
+        if (!task) return;
+
+        // グリッド全体の幅から1日あたりのピクセル数を算出
+        const gridEl = e.target.closest('.content-area');
+        if (!gridEl) return;
+        const  dayWidth = gridEl.getBoundingClientRect().width / 7;
+
+        const startX = e.clientX;
+        const originalStartIdx = task.startIdx;
+        const originalEndIdx = task.endIdx;
+        
+        const barEl = e.target.closest('.bar');
+
+        const onMouseMove = (moveEvent) => {
+            const diffX = moveEvent.clientX - startX;
+            const deltaDays = Math.round(diffX / dayWidth);
+
+            if (edge === 'right') {
+                let newEnd = originalEndIdx + deltaDays;
+                if (newEnd > 6) newEnd = 6;
+                if (newEnd < originalStartIdx) newEnd = originalStartIdx;
+                
+                // 視覚的なフィードバック (CSS widthの更新)
+                if (barEl) {
+                    barEl.style.width = `calc(${((newEnd - originalStartIdx + 1) / 7) * 100}% - 4px)`;
+                }
+            } else if (edge === 'left') {
+                let newStart = originalStartIdx + deltaDays;
+                if (newStart < 0) newStart = 0;
+                if (newStart > originalEndIdx) newStart = originalEndIdx;
+                
+                if (barEl) {
+                    barEl.style.left = `calc(${(newStart / 7) * 100}% + 2px)`;
+                    barEl.style.width = `calc(${((originalEndIdx - newStart + 1) / 7) * 100}% - 4px)`;
+                }
+            }
+        };
+
+        const onMouseUp = (upEvent) => {
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+
+            const diffX = upEvent.clientX - startX;
+            const deltaDays = Math.round(diffX / dayWidth);
+
+            if (edge === 'right') {
+                let newEnd = originalEndIdx + deltaDays;
+                if (newEnd > 6) newEnd = 6;
+                if (newEnd < originalStartIdx) newEnd = originalStartIdx;
+                task.endIdx = newEnd;
+            } else if (edge === 'left') {
+                let newStart = originalStartIdx + deltaDays;
+                if (newStart < 0) newStart = 0;
+                if (newStart > originalEndIdx) newStart = originalEndIdx;
+                task.startIdx = newStart;
+            }
+
+            this.saveConfig();
+            this.render(); // 位置や重なりが変わる可能性があるため全体を再描画
+        };
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
     },
 
     // --- ウィンドウ間連携 / モーダル表示 ---
@@ -488,6 +925,7 @@ const app = {
             win.focus();
         }
     },
+
 
     showPjModal() {
         this.renderProjectBody();
@@ -572,15 +1010,16 @@ const app = {
         localStorage.setItem('pj_select_signal', signal);
     },
 
-    // --- メンバー管理 ---
-    showMemberMng() {
+    // --- 管理画面 ---
+    showAdminMng() {
         document.getElementById('memberModal').style.display = 'flex';
         this.switchMemberTab('staff');
     },
 
     switchMemberTab(t) {
         document.querySelectorAll('.m-tab').forEach(el => el.classList.remove('active'));
-        const elTab = document.getElementById('mtb-' + (t === 'staff' ? 's' : 't'));
+        const tabMap = { staff: 's', team: 't', tag: 'tag', deleted: 'del', specialItem: 'si' };
+        const elTab = document.getElementById('mtb-' + (tabMap[t] || t));
         if (elTab) elTab.classList.add('active');
         this.renderMemberBody(t);
     },
@@ -610,6 +1049,85 @@ const app = {
                         </tr>`).join('')}
                     </tbody>
                 </table>`;
+        } else if (t === 'tag') {
+            b.innerHTML = `
+                <div class="form-g" style="display:flex;gap:10px;margin:1rem;background:rgba(255,255,255,0.03);padding:1.25rem;border-radius:12px;">
+                    <input id="ntagN" placeholder="新しいタグ名" style="flex:1">
+                    <button class="btn btn-primary" onclick="app.addTag()">タグ登録</button>
+                </div>
+                <table class="m-table">
+                    <thead><tr><th>タグ名</th><th style="width:100px">順序</th><th style="width:60px">操作</th></tr></thead>
+                    <tbody>${this.state.tags.map((x, idx) => `
+                        <tr>
+                            <td><input class="edit-field" value="${this.esc(x.name)}" oninput="app.upTagN('${this.esc(x.id)}', this.value)"></td>
+                            <td>
+                                <div style="display:flex;gap:4px;">
+                                    <button class="btn btn-icon" onclick="app.moveTag(${idx},-1)">▲</button>
+                                    <button class="btn btn-icon" onclick="app.moveTag(${idx},1)">▼</button>
+                                </div>
+                            </td>
+                            <td><button class="btn btn-danger btn-icon" onclick="app.delTag('${this.esc(x.id)}')">×</button></td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>`;
+        } else if (t === 'specialItem') {
+            let sorted = [...this.state.specialItems].sort((a, b) => a.order - b.order);
+            b.innerHTML = `
+                <div class="form-g" style="display:grid;grid-template-columns:1fr auto;gap:15px;padding:1.5rem;background:rgba(255,255,255,0.03);border-radius:12px;margin:1rem;">
+                    <div><label>特別項目の名称</label><input id="nsSI" placeholder="特別項目名を入力"></div>
+                    <button class="btn btn-primary" style="align-self:end" onclick="app.addSpecialItem()">特別項目を追加</button>
+                </div>
+                <table class="m-table">
+                    <thead><tr><th>名称</th><th style="width:110px">順序</th><th style="width:60px">操作</th></tr></thead>
+                    <tbody>${sorted.map((item, idx) => `
+                        <tr>
+                            <td><input class="edit-field" value="${this.esc(item.name)}" oninput="app.upSpecialItemN('${this.esc(item.id)}', this.value)"></td>
+                            <td>
+                                <div style="display:flex;gap:4px">
+                                    <button class="btn btn-sm" ${idx === 0 ? 'disabled' : ''} onclick="app.upSpecialItemOrder('${this.esc(item.id)}', -1)">▲</button>
+                                    <button class="btn btn-sm" ${idx === sorted.length - 1 ? 'disabled' : ''} onclick="app.upSpecialItemOrder('${this.esc(item.id)}', 1)">▼</button>
+                                </div>
+                            </td>
+                            <td style="text-align:center"><button class="btn btn-danger btn-icon" onclick="app.delSpecialItem('${this.esc(item.id)}')">×</button></td>
+                        </tr>
+                    `).join('')}</tbody>
+                </table>`;
+        } else if (t === 'deleted') {
+            const list = this.state.deletedProjects;
+            b.innerHTML = `
+                <div style="padding:1rem;">
+                    <p style="margin-bottom:1rem; font-size:0.85rem; color:var(--text-secondary);">※ 復元すると製番リストの最後尾に追加されます（No.は自動で振り直されます）。</p>
+                    <table class="m-table">
+                        <thead>
+                            <tr>
+                                <th style="width:110px;">削除日時</th>
+                                <th style="width:110px;">指令書No</th>
+                                <th>客先 / 製品名</th>
+                                <th style="width:140px;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${list.length === 0 ? '<tr><td colspan="3" style="text-align:center; padding:2rem; opacity:0.5;">ゴミ箱は空です</td></tr>' : ''}
+                            ${list.map(p => `
+                                <tr>
+                                    <td style="font-size:0.8rem; opacity:0.8;">${this.esc(p.deletedAt)}</td>
+                                    <td>${this.esc(p.jobNo)}</td>
+                                    <td>
+                                        <div style="font-weight:bold; font-size:0.85rem;">${this.esc(p.customer)}</div>
+                                        <div style="font-size:0.75rem; opacity:0.7;">${this.esc(p.name)}</div>
+                                    </td>
+                                    <td style="text-align:center;">
+                                        <div style="display:flex; gap:8px; justify-content:center; align-items:center;">
+                                            <button class="btn btn-success btn-sm" style="padding:4px 12px; font-size:0.75rem; min-width:60px; height:28px; line-height:1;" onclick="app.restorePj('${this.esc(p.id)}')">復元</button>
+                                            <button class="btn btn-danger btn-icon" style="width:28px; height:28px; padding:0; display:flex; align-items:center; justify-content:center; flex-shrink:0;" onclick="app.clearPjPermanently('${this.esc(p.id)}')">×</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
         } else {
             let sorted = [...this.state.staff].sort((a, b) => a.order - b.order);
             b.innerHTML = `
@@ -692,6 +1210,37 @@ const app = {
             this.render();
         }
     },
+
+    // タグ操作
+    addTag() {
+        const v = document.getElementById('ntagN').value;
+        if (v) {
+            this.state.tags.push({ id: 'tag' + Date.now(), name: v });
+            this.renderMemberBody('tag');
+            this.render();
+        }
+    },
+    upTagN(id, v) { 
+        this.state.tags.find(t => t.id === id).name = v; 
+        this.render(); 
+    },
+    delTag(id) { 
+        if (confirm('タグを削除しますか？')) { 
+            this.state.tags = this.state.tags.filter(t => t.id !== id); 
+            this.validateIntegrity(); 
+            this.render(); 
+            this.renderMemberBody('tag'); 
+        } 
+    },
+    moveTag(idx, dir) {
+        const n = idx + dir;
+        if (n >= 0 && n < this.state.tags.length) {
+            [this.state.tags[idx], this.state.tags[n]] = [this.state.tags[n], this.state.tags[idx]];
+            this.renderMemberBody('tag');
+            this.render();
+        }
+    },
+
     movePj(idx, dir) {
         const n = idx + dir;
         if (n >= 0 && n < this.state.projects.length) {
@@ -701,9 +1250,77 @@ const app = {
         }
     },
 
+    sortPjByTagMaster() {
+        if (!confirm('製番リストをタグの登録順に並び替えますか？\n（案件番号 No. も現在の並び順で振り直されます）')) return;
+
+        const tagOrder = this.state.tags.map(t => t.id);
+        
+        this.state.projects.sort((a, b) => {
+            // 両方タグなし
+            if (!a.tagId && !b.tagId) return 0;
+            // aのみタグなし（後ろへ）
+            if (!a.tagId) return 1;
+            // bのみタグなし（前へ）
+            if (!b.tagId) return -1;
+            
+            // 両方タグあり：マスターのインデックスで比較
+            const idxA = tagOrder.indexOf(a.tagId);
+            const idxB = tagOrder.indexOf(b.tagId);
+            
+            // 万が一マスターにないIDが入っていた場合は最後尾へ
+            if (idxA === -1 && idxB === -1) return 0;
+            if (idxA === -1) return 1;
+            if (idxB === -1) return -1;
+            
+            return idxA - idxB;
+        });
+
+        this.validateIntegrity(); // No.の振り直しを実行
+        this.render();            // 工程表とデータの更新
+        this.renderProjectBody(); // リスト表示の更新
+    },
+
+    reorderPj(id, newNoStr) {
+        const newNo = parseInt(newNoStr);
+        if (isNaN(newNo) || newNo < 1) {
+            this.renderProjectBody(); // 不正な入力時は描画し直して値を元に戻す
+            return;
+        }
+
+        const projects = this.state.projects;
+        const oldIdx = projects.findIndex(p => p.id === id);
+        if (oldIdx === -1) return;
+
+        // 表示上のNo. (1〜N) を配列インデックス (0〜N-1) に変換
+        const targetIdx = Math.max(0, Math.min(newNo - 1, projects.length - 1));
+
+        if (oldIdx === targetIdx) {
+            this.renderProjectBody();
+            return;
+        }
+
+        // 配列から削除して指定位置に挿入（割り込み処理）
+        const [item] = projects.splice(oldIdx, 1);
+        projects.splice(targetIdx, 0, item);
+
+        this.validateIntegrity(); // No.の振り直しを含む整合性チェック
+        this.render();            // メイン画面（工程表グリッド）の更新
+        this.renderProjectBody(); // 製番リスト画面の更新
+    },
+
     // --- 製番管理 ---
     handlePjFilter(key, val) {
         this.pjFilters[key] = val.toLowerCase();
+        this.renderProjectBody();
+    },
+
+    resetPjFilters() {
+        this.pjFilters = { jobNo: '', customer: '', name: '', team: '', person: '', tagId: '' };
+        const bar = document.querySelector('.pj-search-bar');
+        if (bar) {
+            bar.querySelectorAll('input').forEach(i => i.value = '');
+            bar.querySelectorAll('select').forEach(s => s.value = '');
+        }
         this.renderProjectBody();
     },
 
@@ -739,11 +1356,16 @@ const app = {
         // フィルタ用プルダウンの生成 (v2.41)
         const teamFlt = document.getElementById('fltTeam');
         const personFlt = document.getElementById('fltPerson');
+        const tagFlt = document.getElementById('fltTag');
         if (teamFlt && !teamFlt.options.length) {
             teamFlt.innerHTML = '<option value="">(すべて)</option>' + this.state.teams.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
         }
         if (personFlt && !personFlt.options.length) {
             personFlt.innerHTML = '<option value="">(すべて)</option>' + this.state.staff.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        }
+        if (tagFlt) {
+            tagFlt.innerHTML = '<option value="">(すべて)</option>' + this.state.tags.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+            tagFlt.value = this.pjFilters.tagId;
         }
 
         // 複合フィルタリング処理 (v2.41: AND条件)
@@ -754,7 +1376,8 @@ const app = {
             const matchName = !f.name || (p.name || '').toLowerCase().includes(f.name);
             const matchTeam = !f.team || (p.team === f.team);
             const matchPers = !f.person || (p.person === f.person);
-            return matchJob && matchCust && matchName && matchTeam && matchPers;
+            const matchTag = !f.tagId || (p.tagId === f.tagId);
+            return matchJob && matchCust && matchName && matchTeam && matchPers && matchTag;
         });
 
         const isFiltered = Object.values(this.pjFilters).some(v => v !== '');
@@ -763,8 +1386,8 @@ const app = {
         if (countEl) countEl.innerText = `ヒット: ${filtered.length} / 全 ${this.state.projects.length} 件`;
 
         // 全項目のヘッダー定義 (v2.45)
-        const hs = ['順序', 'No.', '指令書No.', '客先', '向先', '製品名', 'チーム', '担当者', '数量', '納期', '工数', '備考'];
-        const cols = ['col-order', 'col-no', 'col-job', 'col-customer', 'col-dest', 'col-name', 'col-team', 'col-person', 'col-qty', 'col-date', 'col-mh', 'col-notes'];
+        const hs = ['順序', 'No.', '指令書No.', '客先', '向先', '製品名', 'チーム', '担当者', '数量', '納期', '工数', '備考', 'タグ'];
+        const cols = ['col-order', 'col-no', 'col-job', 'col-customer', 'col-dest', 'col-name', 'col-team', 'col-person', 'col-qty', 'col-date', 'col-mh', 'col-notes', 'col-tag'];
 
         b.innerHTML = `
             <table class="m-table">
@@ -777,10 +1400,18 @@ const app = {
                     </tr>
                 </thead>
                 <tbody>
-                    ${filtered.map(p => {
-            const teamName = this.state.teams.find(t => t.id === p.team)?.name || '未設定';
-            const staffName = this.state.staff.find(s => s.id === p.person)?.name || '未設定';
-            return `
+                    ${(() => {
+                        let lastTagId = undefined;
+                        return filtered.map(p => {
+                            let header = '';
+                            if (p.tagId !== lastTagId) {
+                                const tagName = this.state.tags.find(t => t.id === p.tagId)?.name || '未設定';
+                                header = `<tr class="tag-group-header"><td colspan="16">🏷️ ${this.esc(tagName)}</td></tr>`;
+                                lastTagId = p.tagId;
+                            }
+                            const teamName = this.state.teams.find(t => t.id === p.team)?.name || '未設定';
+                            const staffName = this.state.staff.find(s => s.id === p.person)?.name || '未設定';
+                            return header + `
                         <tr>
                             <td class="col-color-indicator" style="background:${this.esc(p.color)}"></td>
                             <td class="col-sel"><button class="btn btn-select btn-icon" onclick="app.selectSelf('${this.esc(p.id)}')">選択</button></td>
@@ -792,7 +1423,9 @@ const app = {
                                     </div>
                                 ` : '<span style="opacity:0.3">-</span>'}
                             </td>
-                            <td class="col-no">${this.esc(p.no)}</td>
+                            <td class="col-no">
+                                <input type="number" class="no-edit" value="${this.esc(p.no)}" onchange="app.reorderPj('${this.esc(p.id)}', this.value)">
+                            </td>
                             <td class="col-job"><textarea class="edit-field" rows="1" oninput="app.adjustTextareaSize(this)" onchange="app.upPj('${this.esc(p.id)}', 'jobNo', this.value)">${this.esc(p.jobNo) || ''}</textarea></td>
                             <td class="col-customer"><textarea class="edit-field" rows="1" oninput="app.adjustTextareaSize(this)" onchange="app.upPj('${this.esc(p.id)}', 'customer', this.value)">${this.esc(p.customer) || ''}</textarea></td>
                             <td class="col-dest"><textarea class="edit-field" rows="1" oninput="app.adjustTextareaSize(this)" onchange="app.upPj('${this.esc(p.id)}', 'destination', this.value)">${this.esc(p.destination) || ''}</textarea></td>
@@ -813,9 +1446,16 @@ const app = {
                             <td class="col-date"><textarea class="edit-field" rows="1" oninput="app.adjustTextareaSize(this)" onchange="app.upPj('${this.esc(p.id)}', 'deadline', this.value)">${this.esc(p.deadline) || ''}</textarea></td>
                             <td class="col-mh"><textarea class="edit-field" rows="1" oninput="app.adjustTextareaSize(this)" onchange="app.upPj('${this.esc(p.id)}', 'manHours', this.value)">${this.esc(p.manHours) || ''}</textarea></td>
                             <td class="col-notes"><textarea class="edit-field" rows="1" oninput="app.adjustTextareaSize(this)" onchange="app.upPj('${this.esc(p.id)}', 'notes', this.value)">${this.esc(p.notes) || ''}</textarea></td>
+                            <td class="col-tag">
+                                <select class="edit-field" onchange="app.upPj('${this.esc(p.id)}', 'tagId', this.value)">
+                                    <option value="">未設定</option>
+                                    ${this.state.tags.map(t => `<option value="${this.esc(t.id)}" ${t.id === p.tagId ? 'selected' : ''}>${this.esc(t.name)}</option>`).join('')}
+                                </select>
+                            </td>
                             <td class="col-opt"><button class="btn btn-danger btn-icon" onclick="app.delPj('${this.esc(p.id)}')">×</button></td>
                         </tr>`;
-        }).join('')}
+                        }).join('');
+                    })()}
                 </tbody>
             </table>`;
 
@@ -845,11 +1485,42 @@ const app = {
     },
 
     delPj(id) {
-        if (confirm('製番データを削除しますか？')) {
-            this.state.projects = this.state.projects.filter(p => p.id !== id);
+        if (confirm('製番データを削除（ゴミ箱へ移動）しますか？')) {
+            const idx = this.state.projects.findIndex(p => p.id === id);
+            if (idx !== -1) {
+                const [pj] = this.state.projects.splice(idx, 1);
+                pj.deletedAt = new Date().toLocaleString('ja-JP', { 
+                    month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' 
+                });
+                this.state.deletedProjects.push(pj);
+                // 最大50件保持
+                if (this.state.deletedProjects.length > 50) {
+                    this.state.deletedProjects.shift();
+                }
+                this.validateIntegrity();
+                this.render();
+                this.renderProjectBody();
+            }
+        }
+    },
+
+    restorePj(id) {
+        const idx = this.state.deletedProjects.findIndex(p => p.id === id);
+        if (idx !== -1) {
+            const [pj] = this.state.deletedProjects.splice(idx, 1);
+            this.state.projects.push(pj);
             this.validateIntegrity();
             this.render();
-            this.renderProjectBody();
+            this.renderMemberBody('deleted');
+            alert('案件を復元しました（リストの最後尾に追加されました）');
+        }
+    },
+
+    clearPjPermanently(id) {
+        if (confirm('この案件をゴミ箱から完全に削除しますか？\n（復元できなくなります）')) {
+            this.state.deletedProjects = this.state.deletedProjects.filter(p => p.id !== id);
+            this.saveConfig();
+            this.renderMemberBody('deleted');
         }
     },
 
@@ -925,25 +1596,68 @@ const app = {
                 qty: cols[6] || '',         // 7列目: 数量 (移動後)
                 deadline: cols[7] || '',    // 8列目: 納期
                 manHours: cols[8] || '',    // 9列目: 工数
-                notes: cols[9] || ''        // 10列目: 備考
+                notes: cols[9] || '',       // 10列目: 備考
+                tagId: ''                   // 11列目以降（初期値は空）
             });
+            // タグ名でのマッチングが必要な場合は将来的に拡張可能
         });
         this.validateIntegrity();
         this.render();
         this.renderProjectBody();
     },
 
+    // 手動で製番リストに新規案件を追加する機能
+    addBlankProject() {
+        this.state.projects.push({
+            id: `p_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
+            no: '',
+            jobNo: '',
+            customer: '',
+            destination: '',
+            name: '',
+            team: '',
+            person: '',
+            qty: '',
+            deadline: '',
+            manHours: '',
+            notes: '',
+            tagId: ''
+        });
+        this.validateIntegrity(); // No.を再計算
+        this.render(); // 工程表がある場合の再描画
+        this.renderProjectBody();
+
+        // 一番下までスクロールして新しく追加された行を見やすくする
+        setTimeout(() => {
+            const pjView = document.getElementById('pjView');
+            if (pjView) pjView.scrollTop = pjView.scrollHeight;
+        }, 50);
+    },
+
     // --- その他 ---
     hideModal(id) { document.getElementById(id).style.display = 'none'; },
     exportData() {
-        const d = new Date();
-        const fn = `scheduler_export_${d.getFullYear()}${d.getMonth() + 1}${d.getDate()}.json`;
+        const mon = new Date(this.state.monday);
+        const sun = new Date(mon);
+        sun.setDate(mon.getDate() + 6);
+        
+        const pad = (n) => n.toString().padStart(2, '0');
+        const f = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+        
+        const fn = `工程データ(${f(mon)}-${f(sun)}).json`;
         const blob = new Blob([JSON.stringify(this.state, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = fn;
         a.click();
+    },
+    print() {
+        // 印刷前に製番リストを最新状態にする（もし隠れていてもデータがあればレンダリングする）
+        if (this.state.projects.length > 0) {
+            this.renderProjectBody();
+        }
+        window.print();
     },
     // 共通データ反映処理 (v2.60)
     applyData(jsonText) {
@@ -958,7 +1672,11 @@ const app = {
                 teams: Array.isArray(data.teams) ? data.teams : [],
                 staff: Array.isArray(data.staff) ? data.staff : [],
                 projects: Array.isArray(data.projects) ? data.projects : [],
+                deletedProjects: Array.isArray(data.deletedProjects) ? data.deletedProjects : [],
+                tags: Array.isArray(data.tags) ? data.tags : [],
                 schedule: Array.isArray(data.schedule) ? data.schedule : [],
+                holidays: Array.isArray(data.holidays) ? data.holidays : [],
+                specialItems: Array.isArray(data.specialItems) ? data.specialItems : this.state.specialItems,
                 monday: data.monday || this.state.monday,
                 team: data.team || 'all'
             });
@@ -978,13 +1696,17 @@ const app = {
         if (!overlay) return;
 
         window.addEventListener('dragenter', (e) => {
-            e.preventDefault();
-            overlay.classList.add('active');
+            if (this.isFileDrag(e)) {
+                e.preventDefault();
+                overlay.classList.add('active');
+            }
         });
 
         window.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            if (!overlay.classList.contains('active')) overlay.classList.add('active');
+            if (this.isFileDrag(e)) {
+                e.preventDefault();
+                if (!overlay.classList.contains('active')) overlay.classList.add('active');
+            }
         });
 
         window.addEventListener('dragleave', (e) => {
@@ -996,11 +1718,15 @@ const app = {
         });
 
         window.addEventListener('drop', async (e) => {
-            e.preventDefault();
+            // もしファイルドロップ用のオーバーレイが出ていた場合は消す
             overlay.classList.remove('active');
+            
+            // ファイルのドロップでなければ何もしない
+            if (!this.isFileDrag(e)) return;
 
+            e.preventDefault();
             const file = e.dataTransfer.files[0];
-            if (file && file.type === "application/json" || file.name.endsWith('.json')) {
+            if (file && (file.type === "application/json" || file.name.endsWith('.json'))) {
                 const text = await file.text();
                 this.applyData(text);
             } else {

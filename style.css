@@ -180,6 +180,51 @@ main {
     margin-bottom: 4px;
 }
 
+/* --- Holiday Styles (v3.00) --- */
+/* --- Holiday Styles (v3.10: Robust Cell-based) --- */
+.click-cell.is-holiday {
+    background: rgba(239, 68, 68, 0.08); /* 薄い赤 */
+    border-left: 1px dashed rgba(239, 68, 68, 0.15);
+    border-right: 1px dashed rgba(239, 68, 68, 0.15);
+}
+
+.grid-header.is-holiday {
+    background: rgba(239, 68, 68, 0.2) !important;
+    transition: background 0.2s;
+}
+
+.grid-header.is-holiday:hover {
+    background: rgba(239, 68, 68, 0.3) !important;
+}
+
+.holiday-label {
+    margin-top: 4px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: white;
+    background: var(--danger-color);
+    padding: 1px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+
+.modal-tight .m-tabs {
+    background: rgba(0,0,0,0.1);
+    border-radius: 8px;
+    padding: 4px;
+}
+.modal-tight .m-tab {
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    border-radius: 6px;
+}
+.modal-tight .m-tab.active {
+    background: var(--accent-color);
+    color: white;
+}
+
 .grid-row { display: contents; }
 
 .grid-sidebar {
@@ -320,6 +365,22 @@ main {
     color: var(--accent-color);
     text-transform: uppercase;
     margin-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.tag-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: white;
+    background: var(--accent-color);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    white-space: nowrap;
 }
 
 .detail-title {
@@ -568,7 +629,7 @@ select:focus, input:focus {
 .col-color-indicator { width: 8px; min-width: 8px; }
 .col-sel { width: 75px; min-width: 75px; }
 .col-order { width: 80px; min-width: 80px; }
-.col-no { width: 50px; min-width: 50px; }
+.col-no { width: 60px; min-width: 60px; }
 .col-job { width: 160px; min-width: 160px; }
 .col-customer { width: 200px; min-width: 180px; }
 .col-dest { width: 200px; min-width: 180px; }
@@ -579,11 +640,67 @@ select:focus, input:focus {
 .col-date { width: 115px; min-width: 110px; text-align: center; }
 .col-mh { width: 80px; min-width: 75px; text-align: center; }
 .col-notes { width: auto; min-width: 200px; }
+.col-tag { width: 140px; min-width: 140px; }
 .col-opt { width: 65px; min-width: 60px; }
 
 .m-table .edit-field {
     width: 100% !important;
     min-width: 0 !important;
+}
+
+.no-edit {
+    width: 100%;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--accent-color);
+    font-weight: 800;
+    text-align: center;
+    font-size: 1rem;
+    padding: 2px;
+    border-radius: 4px;
+    transition: 0.2s;
+    appearance: none;
+    -moz-appearance: textfield;
+}
+
+.no-edit::-webkit-outer-spin-button,
+.no-edit::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.no-edit:hover {
+    background: rgba(255,255,255,0.05);
+    border-color: var(--border-color);
+}
+
+.no-edit:focus {
+    background: var(--bg-color);
+    border-color: var(--accent-color);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.tag-group-header {
+    background: rgba(71, 85, 105, 0.4) !important;
+    color: var(--text-primary);
+    /* フォント調整: 全体的に視認性を高める */
+    font-family: 'Inter', 'Noto Sans JP', sans-serif;
+    letter-spacing: -0.01em;
+}
+
+/* --- Special Bar Styles (v3.26: Robust) --- */
+.bar-special {
+    opacity: 1 !important;
+    border: 1px dashed rgba(255,255,255,0.5) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+    font-style: italic;
+    background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0, rgba(255,255,255,0.05) 10px, transparent 10px, transparent 20px);
+    z-index: 15 !important; /* 通常のバー(10)より手動調整に強く */
+}
+
+.tag-group-header td {
+    padding: 0.6rem 1rem !important;
 }
 
 .m-table select.edit-field {
@@ -878,4 +995,223 @@ select:focus, input:focus {
 @keyframes slideDown {
     from { opacity: 0; transform: translateY(-20px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Special Bar Styles (v3.27: HIGH VISIBILITY) --- */
+.bar-special {
+    opacity: 1 !important;
+    border: 2px solid rgba(255,255,255,0.6) !important;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5) !important;
+    font-style: italic;
+    background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.1) 0, rgba(255,255,255,0.1) 10px, transparent 10px, transparent 20px);
+    z-index: 25 !important;
+    display: flex !important;
+}
+
+/* --- リサイズハンドル --- */
+.resize-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    z-index: 10;
+}
+.resize-handle:hover {
+    background: rgba(255, 255, 255, 0.4);
+}
+.resize-handle.left {
+    left: 0;
+    cursor: ew-resize;
+}
+.resize-handle.right {
+    right: 0;
+    cursor: ew-resize;
+}
+
+/* ==========================================================================
+   印刷専用スタイル (@media print) - A4縦・白黒・シンプル (v4 改良版)
+   ========================================================================== */
+@media print {
+    /* 1. 変数と基本リセット */
+    :root {
+        --bg-primary: #ffffff;
+        --bg-secondary: #ffffff;
+        --bg-tertiary: #ffffff;
+        --bg-modal: #ffffff;
+        --text-primary: #000000;
+        --text-secondary: #000000;
+        --border-color: #000000;
+        --accent-color: #000000;
+    }
+
+    * {
+        background: transparent !important;
+        color: black !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+        backdrop-filter: none !important;
+        -webkit-print-color-adjust: economy;
+        print-color-adjust: economy;
+    }
+
+    body {
+        background: white !important;
+        padding: 0;
+        margin: 0;
+        font-size: 8pt; /* A4縦に収めるために最適化 */
+    }
+
+    /* 2. 不要なUIの完全非表示 */
+    header,
+    .controls,
+    .tabs,
+    .week-nav button,
+    .detail-panel,
+    .drop-hint,
+    .pj-search-bar,
+    .paste-area,
+    #statsArea,
+    #assignHint,
+    .m-footer,
+    .resize-handle,
+    .btn,
+    .btn-sm,
+    .overlay:not(#pjOverlay),
+    #pjOverlay .controls,
+    #pjOverlay .paste-area,
+    .table-container th:last-child,
+    .table-container td:last-child,
+    .grid-total-header,
+    .grid-total-cell {
+        display: none !important;
+    }
+
+    /* 3. 工程表（グリッド）の調整 */
+    main { padding: 0 !important; margin: 0 !important; }
+    .app-main-layout { display: block !important; }
+    
+    .scheduler-card {
+        box-shadow: none !important;
+        border: none !important;
+        margin-bottom: 30px;
+    }
+
+    .week-nav {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        border-bottom: 2px solid black;
+        padding-bottom: 5px;
+        margin-bottom: 15px !important;
+    }
+    .week-nav::before {
+        content: "工程管理スケジュール";
+        font-weight: 800;
+        font-size: 1.1rem;
+    }
+    .week-text {
+        font-size: 0.95rem !important;
+        min-width: auto !important;
+    }
+
+    /* グリッド列の再定義 (ポートレート用: サイドバーをさらに詰め、合計列を完全に消す) */
+    .grid-container {
+        display: grid !important;
+        grid-template-columns: 80px repeat(7, 1fr) 0px !important; 
+        width: 100% !important;
+        border: 1px solid black !important;
+    }
+
+    .grid-header, .grid-sidebar, .click-cell {
+        border: 1px solid black !important;
+        position: static !important; /* スティッキーなどを解除 */
+    }
+
+    .grid-header { height: 35px !important; }
+    .grid-sidebar { 
+        padding: 3px !important; 
+        min-height: 50px !important; 
+        width: 80px !important;
+    }
+    .staff-name { font-size: 0.8rem !important; }
+    .staff-team { font-size: 0.65rem !important; }
+
+    /* バーのシンプル化 */
+    .bar {
+        background: white !important;
+        border: 1px solid black !important;
+        height: 18px !important;
+        color: black !important;
+        border-radius: 0 !important;
+        padding: 0 2px !important;
+    }
+    .bar span {
+        color: black !important;
+        font-weight: 400 !important;
+        font-size: 0.7rem !important;
+    }
+
+    /* 4. 製番リストの調整（重要：高さ制限とオーバーフローを解除） */
+    #pjOverlay {
+        display: block !important;
+        position: static !important;
+        height: auto !important;
+        overflow: visible !important;
+        page-break-before: always;
+    }
+
+    .pj-view.modal-full, #pjView {
+        width: 100% !important;
+        height: auto !important;
+        max-height: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        display: block !important;
+        overflow: visible !important;
+        position: static !important;
+    }
+
+    #pjView h2 {
+        border-bottom: 2px solid black;
+        font-size: 1.1rem !important;
+        margin-bottom: 15px !important;
+        padding-bottom: 5px;
+    }
+
+    .table-container { 
+        overflow: visible !important; 
+        max-height: none !important; 
+        height: auto !important;
+    }
+
+    table { 
+        width: 100% !important; 
+        border-collapse: collapse !important; 
+        border: 1px solid black; 
+        table-layout: auto !important; 
+    }
+    
+    th, td { 
+        border: 1px solid black !important; 
+        padding: 4px !important; 
+        font-size: 8pt !important; 
+        height: auto !important;
+        white-space: normal !important; /* 印刷時は折り返しを許可 */
+    }
+    
+    /* フォームのテキスト化 */
+    textarea, input {
+        border: none !important;
+        padding: 0 !important;
+        font-size: inherit !important;
+        display: inline !important; /* text-areaが消えないように */
+        width: 100% !important;
+        height: auto !important;
+    }
+
+    /* ページ設定（A4 縦） */
+    @page {
+        size: A4 portrait;
+        margin: 15mm 10mm;
+    }
 }

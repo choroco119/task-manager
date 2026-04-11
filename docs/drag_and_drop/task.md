@@ -1,7 +1,11 @@
-- [x] ドラッグ＆ドロップ機能の基本ベースを実装する
-- [x] `index.html` にドロップ用オーバーレイを追加
-- [x] `style.css` にオーバーレイのスタイルを追加
-- [x] `app.js` にイベントリスナーとファイル処理ロジックを実装
-    - [x] 共通の読み込みロジックの抽出
-    - [x] `initDragAndDrop`の実装
-- [x] 動作確認（正常系・異常系）
+# タスクリスト: JSONドラッグ＆ドロップ競合修正
+
+- [x] (1) `app.js` に `app.isFileDrag(e)` メソッドを実装
+- [x] (2) `initDragAndDrop` を `this.isFileDrag(e)` を使うように修正
+- [x] (3) 以下の各種ハンドラに `if (this.isFileDrag(e)) return;` を追加
+    - [x] `handleDragOver`
+    - [x] `handleDragEnter`
+    - [x] `handleDragLeave`
+    - [x] `handleDrop`
+- [x] (4) 実機相当の動作確認（コードロジックの再点検）
+- [x] (5) `walkthrough.md` の作成

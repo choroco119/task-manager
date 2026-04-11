@@ -16,14 +16,15 @@
 <body>
 
     <header>
-        <div class="logo">PROCESS MANAGER v1.00</div>
+        <div class="logo">工程管理システム v1.00</div>
         <div class="controls">
-            <button class="btn btn-success" onclick="app.exportData()">データを出力</button>
+            <button class="btn btn-success" onclick="app.exportData()">データ出力</button>
             <div class="drop-hint">📥 JSONをドロップして読込</div>
             <div style="width:1px; height:24px; background:var(--border-color); margin:0 5px;"></div>
-            <button class="btn btn-primary" onclick="app.showMemberMng()">メンバー管理</button>
+            <button class="btn btn-primary" onclick="app.print()">印刷</button>
+            <button class="btn btn-primary" onclick="app.showAdminMng()">管理画面</button>
             <button class="btn btn-primary" onclick="app.showProjectMng()">製番リスト (別窓)</button>
-            <button class="btn btn-danger" onclick="app.clearAllData()">データを全削除</button>
+            <button class="btn btn-danger" onclick="app.clearAllData()">データ全削除</button>
         </div>
     </header>
 
@@ -42,7 +43,8 @@
                         <span style="font-size:1.2rem;">📍</span>
                         <span id="assignHintText">割り当てるセルを選択してください</span>
                     </div>
-                    <button class="btn btn-sm" style="background:rgba(255,255,255,0.2); color:white; border:none;" onclick="app.clearPendingPid()">キャンセル</button>
+                    <button class="btn btn-sm" style="background:rgba(255,255,255,0.2); color:white; border:none;"
+                        onclick="app.clearPendingPid()">キャンセル</button>
                 </div>
                 <div class="grid-container" id="grid"></div>
                 <!-- 統計・集計エリア -->
@@ -62,21 +64,32 @@
     <!-- 製番リストビュー (モーダル兼用 v2.80) -->
     <div class="overlay" id="pjOverlay">
         <div class="pj-view modal-full" id="pjView">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+            <div
+                style="display:flex; justify-content:space-between; align-items:stretch; margin-bottom:1.5rem; gap:1.5rem;">
                 <div>
-                    <h2 style="color:var(--accent-color); font-size:1.5rem;">製番・案件リスト管理</h2>
+                    <h2 style="color:var(--accent-color); font-size:1.5rem; margin:0; line-height:1.2;">製番・案件リスト管理</h2>
                     <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:4px;">
-                        Excel表からの貼り付けや、案件の個別選択が可能です
+                        個別選択や直接編集が可能です
                     </div>
                 </div>
-                <div class="controls">
+
+                <div class="paste-area" onclick="document.getElementById('pasteInp').focus()"
+                    style="flex:1; margin:0; min-height:60px; display:flex; align-items:center; justify-content:center; padding:10px 15px;">
+                    <div style="display:flex; align-items:baseline; gap:15px;">
+                        <span style="font-size:1.1rem; font-weight:800; white-space:nowrap;">Excel表をここに貼り付け
+                            (Ctrl+V)</span>
+                        <span style="font-size:0.75rem; opacity:0.7; white-space:nowrap;">指令書No. / 客先 / 製品名 ...
+                            の列形式</span>
+                    </div>
+                    <!-- テキストエリアの中身は見せないが機能させる -->
+                    <textarea id="pasteInp" onpaste="app.handlePaste(event)"
+                        style="opacity:0.01; position:absolute; width:1px; height:1px;"></textarea>
+                </div>
+
+                <div class="controls" style="display:flex; align-items:center; gap:8px;">
+                    <button class="btn btn-primary" onclick="app.addBlankProject()">+手入力で追加</button>
                     <button class="btn" onclick="app.hidePjModal()">画面を閉じる</button>
                 </div>
-            </div>
-            <div class="paste-area" onclick="document.getElementById('pasteInp').focus()">
-                <div style="font-size:1.1rem; font-weight:800;">Excel表をここに貼り付け (Ctrl+V)</div>
-                <div style="font-size:0.8rem; opacity:0.7; margin-top:4px;">指令書No. / 客先 / 製品名 ... の形式に対応</div>
-                <textarea id="pasteInp" onpaste="app.handlePaste(event)"></textarea>
             </div>
 
             <!-- マルチフィルタ・コンソール (v2.41) -->
@@ -101,6 +114,17 @@
                     <label>担当者</label>
                     <select id="fltPerson" onchange="app.handlePjFilter('person', this.value)"></select>
                 </div>
+                <div class="filter-item">
+                    <label>タグ</label>
+                    <select id="fltTag" onchange="app.handlePjFilter('tagId', this.value)"></select>
+                </div>
+                <div class="filter-item"
+                    style="flex:0; min-width:auto; display:flex; flex-direction:row; gap:8px; align-items:flex-end;">
+                    <button class="btn btn-danger" onclick="app.resetPjFilters()"
+                        style="padding:0.6rem 1rem; font-size:0.85rem;">リセット</button>
+                    <button class="btn btn-primary" onclick="app.sortPjByTagMaster()"
+                        style="padding:0.6rem 1rem; font-size:0.85rem;">タグ順に整列</button>
+                </div>
                 <div id="pjCount" class="pj-count">全 0 件</div>
             </div>
 
@@ -115,11 +139,24 @@
                 <h3 id="targetStaff" style="font-size:1.2rem; color:var(--accent-color);">工程割り当て</h3>
             </div>
 
-            <div class="form-g">
+            <div class="m-tabs" style="margin-bottom:1.25rem;">
+                <div class="m-tab active" id="atb-p" onclick="app.switchAssignTab('project')">製番の割当</div>
+                <div class="m-tab" id="atb-s" onclick="app.switchAssignTab('special')">休暇・特別項目</div>
+            </div>
+
+            <div id="assign-p-sec" class="form-g">
                 <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:0.75rem;">
-                    <label style="margin-bottom:0;">1. 対象製番の確認</label>
+                    <label style="margin-bottom:0;">対象製番の選択</label>
                 </div>
                 <select id="pSel" style="height:46px;"></select>
+            </div>
+
+            <div id="assign-s-sec" class="form-g" style="display:none;">
+                <label style="margin-bottom:0.75rem;">特別項目の入力 (休暇、出張など)</label>
+                <input type="text" id="sTitle" placeholder="テキストを入力..." style="height:46px; margin-bottom:12px;">
+                <div id="specialItemsContainer" style="display:flex; gap:8px; margin-bottom:1.5rem; flex-wrap:wrap;">
+                    <!-- JSにて動的に生成されます -->
+                </div>
             </div>
 
             <div
@@ -147,11 +184,12 @@
                 </div>
             </div>
 
-            <div class="m-footer">
-                <button class="btn btn-danger" id="delBtn" onclick="app.delSchedule()">削除</button>
-                <div style="flex:1"></div>
-                <button class="btn" onclick="app.hideModal('assignModal')">キャンセル</button>
-                <button class="btn btn-primary" onclick="app.saveSchedule()">確定して保存</button>
+            <div class="m-footer" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:1.5rem;">
+                <button class="btn btn-danger" id="delBtn" onclick="app.delSchedule()" style="width:100%;">解除</button>
+                <button class="btn btn-success" id="compBtn" onclick="app.completeSchedule()"
+                    style="width:100%;">完了(製番削除)</button>
+                <button class="btn" onclick="app.hideModal('assignModal')" style="width:100%;">キャンセル</button>
+                <button class="btn btn-primary" onclick="app.saveSchedule()" style="width:100%;">確定して保存</button>
             </div>
         </div>
     </div>
@@ -159,10 +197,13 @@
     <!-- メンバー管理モーダル -->
     <div class="overlay" id="memberModal">
         <div class="modal modal-lg">
-            <h3>メンバー管理</h3>
+            <h3>管理画面</h3>
             <div class="m-tabs">
                 <div class="m-tab" id="mtb-s" onclick="app.switchMemberTab('staff')">メンバー設定</div>
                 <div class="m-tab" id="mtb-t" onclick="app.switchMemberTab('team')">チーム設定</div>
+                <div class="m-tab" id="mtb-tag" onclick="app.switchMemberTab('tag')">タグ設定</div>
+                <div class="m-tab" id="mtb-si" onclick="app.switchMemberTab('specialItem')">特別項目</div>
+                <div class="m-tab" id="mtb-del" onclick="app.switchMemberTab('deleted')">削除済み案件</div>
             </div>
             <div id="memberBody" style="overflow-y:auto; flex:1;"></div>
             <div class="m-footer">
