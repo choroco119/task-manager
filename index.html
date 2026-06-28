@@ -11,20 +11,25 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <!-- 外部スタイルシート -->
     <link rel="stylesheet" href="style.css">
+    <!-- Lucide Icons (CDN) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 
 <body>
 
     <header>
         <div class="logo">工程管理システム v1.00</div>
-        <div class="controls">
-            <button class="btn btn-success" onclick="app.exportData()">データ出力</button>
-            <div class="drop-hint">📥 JSONをドロップして読込</div>
+        <div class="controls" style="display:flex; align-items:center; gap:8px;">
+            <div id="sync-status" class="sync-status">
+                <i data-lucide="cloud-off"></i> フォルダ未接続
+            </div>
+            <button class="btn btn-success" id="save-sync-btn" title="最新データを読み込み">更新</button>
+            <button class="btn btn-warning" id="quick-sync-btn" title="記憶したフォルダで同期を開始" style="display: none;">クイック同期</button>
+            <button class="btn btn-secondary" id="sync-folder-btn" title="共有フォルダを選択して同期">同期設定</button>
             <div style="width:1px; height:24px; background:var(--border-color); margin:0 5px;"></div>
-            <button class="btn btn-primary" onclick="app.print()">印刷</button>
-            <button class="btn btn-primary" onclick="app.showAdminMng()">管理画面</button>
+            <button class="btn btn-info" onclick="app.print()">印刷</button>
+            <button class="btn btn-indigo" onclick="app.showAdminMng()">管理画面</button>
             <button class="btn btn-primary" onclick="app.showProjectMng()">製番リスト (別窓)</button>
-            <button class="btn btn-danger" onclick="app.clearAllData()">データ全削除</button>
         </div>
     </header>
 
@@ -212,16 +217,10 @@
         </div>
     </div>
 
-    <!-- ドラッグ＆ドロップ用オーバーレイ -->
-    <div id="dropOverlay" class="drop-overlay">
-        <div class="drop-message">
-            <div style="font-size:4rem; margin-bottom:1rem;">📂</div>
-            <div style="font-size:1.5rem; font-weight:800;">JSONファイルをドロップして読み込み</div>
-            <div style="font-size:0.9rem; opacity:0.7; margin-top:0.5rem;">現在のデータは上書きされます</div>
-        </div>
-    </div>
+
 
     <!-- 外部スクリプト -->
+    <script src="js/sync-manager.js"></script>
     <script src="app.js"></script>
 </body>
 

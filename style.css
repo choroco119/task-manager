@@ -1,19 +1,29 @@
+html {
+    font-size: 14px; /* FHD解像度での全体視認性を高めるため、ベースサイズを16pxから14pxに縮小 */
+}
+
 :root {
     --bg-color: #0f172a;
     --surface-color: #1e293b;
-    --border-color: #475569;
-    --text-primary: #f8fafc;
+    --border-color: #334155; /* 暗めで繊細な境界線 */
+    --text-primary: #f1f5f9;
     --text-secondary: #94a3b8;
-    --accent-color: #6366f1;
-    --accent-hover: #818cf8;
+    --accent-color: #3b82f6; /* ブルー系アクセント */
+    --accent-hover: #2563eb;
     --success-color: #10b981;
     --danger-color: #ef4444;
     --warning-color: #f59e0b;
     --saturday-color: #3b82f6;
     --leader-color: #fbbf24;
-    --sidebar-width: 240px;
-    --row-height: 120px;
+    --sidebar-width: 200px; /* 240px から 200px に縮小 */
+    --row-height: 83px;     /* 2行分の基本の高さ (83px) */
     --col-width: 1fr;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.5);
+    --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --radius-xl: 1rem;
 }
 
 /* --- Base Styles --- */
@@ -35,7 +45,7 @@ body {
 
 /* --- Header & Tabs --- */
 header {
-    padding: 0.75rem 2rem;
+    padding: 0.5rem 1.5rem;
     background: var(--surface-color);
     border-bottom: 1px solid var(--border-color);
     display: flex;
@@ -58,28 +68,111 @@ header {
 }
 
 .btn {
-    padding: 0.75rem 1.5rem;
-    border-radius: 0.6rem;
-    border: 1px solid var(--border-color);
-    background: var(--surface-color);
-    color: white;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-md);
+    font-weight: 500;
     cursor: pointer;
-    font-size: 0.95rem; 
-    font-weight: 600;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.2s;
+    border: 1px solid var(--border-color);
+    gap: 0.5rem;
+    background-color: #334155;
+    color: white;
+    font-size: 0.9rem;
     white-space: nowrap;
 }
 
 .btn:hover:not(:disabled) {
-    background: var(--border-color);
-    border-color: var(--accent-color);
-    transform: translateY(-1px);
+    background-color: #475569;
 }
 
-.btn-primary { background: var(--accent-color); border: none; }
-.btn-success { background: var(--success-color); border: none; }
-.btn-danger { color: var(--danger-color); border-color: var(--danger-color); }
-.btn-danger:hover { background: var(--danger-color); color: white; border-color: var(--danger-color); }
+.btn-primary {
+    background-color: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+}
+
+.btn-primary:hover:not(:disabled) {
+    background-color: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+
+.btn-success {
+    background-color: var(--success-color);
+    color: white;
+    border-color: var(--success-color);
+}
+
+.btn-success:hover:not(:disabled) {
+    background-color: #059669;
+    border-color: #059669;
+}
+
+.btn-danger {
+    background-color: var(--danger-color);
+    color: white;
+    border-color: var(--danger-color);
+}
+
+.btn-danger:hover:not(:disabled) {
+    background-color: #dc2626;
+    border-color: #dc2626;
+}
+
+.btn-warning {
+    background-color: var(--warning-color);
+    color: white;
+    border-color: var(--warning-color);
+}
+
+.btn-warning:hover:not(:disabled) {
+    background-color: #d97706;
+    border-color: #d97706;
+}
+
+.btn-secondary {
+    background-color: #475569;
+    color: white;
+    border-color: #475569;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background-color: #334155;
+    border-color: #334155;
+}
+
+.btn-info {
+    background-color: #06b6d4;
+    color: white;
+    border-color: #06b6d4;
+}
+
+.btn-info:hover:not(:disabled) {
+    background-color: #0891b2;
+    border-color: #0891b2;
+}
+
+.btn-indigo {
+    background-color: #6366f1;
+    color: white;
+    border-color: #6366f1;
+}
+
+.btn-indigo:hover:not(:disabled) {
+    background-color: #4f46e5;
+    border-color: #4f46e5;
+}
+
+.btn-outline {
+    background-color: transparent;
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+.btn-outline:hover:not(:disabled) {
+    background-color: rgba(255, 255, 255, 0.05);
+}
 
 .drop-hint {
     font-size: 0.85rem;
@@ -132,27 +225,27 @@ main {
 .scheduler-card {
     flex: 1; /* 工程表を可能な限り広げる */
     background: var(--surface-color);
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
     border: 1px solid var(--border-color);
     position: relative;
     overflow: auto; /* 工程表内でのスクロール */
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-sm);
 }
 
 .week-nav {
-    padding: 1.5rem 2rem;
+    padding: 0.75rem 1.5rem;
     background: rgba(0,0,0,0.1);
     border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
-    gap: 2rem;
+    gap: 1.5rem;
 }
 
 .week-text {
     font-weight: 800;
-    min-width: 320px;
+    min-width: 280px;
     text-align: center;
-    font-size: 1.4rem;
+    font-size: 1.2rem;
     color: var(--text-primary);
 }
 
@@ -162,13 +255,13 @@ main {
 }
 
 .grid-header {
-    height: 64px;
+    height: 48px;
     background: rgba(0,0,0,0.25);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--text-secondary);
     border-right: 1px solid rgba(255,255,255,0.05);
     border-bottom: 1px solid var(--border-color);
@@ -176,8 +269,8 @@ main {
 
 .grid-header b {
     color: var(--text-primary);
-    font-size: 1rem;
-    margin-bottom: 4px;
+    font-size: 0.9rem;
+    margin-bottom: 2px;
 }
 
 /* --- Holiday Styles (v3.00) --- */
@@ -229,7 +322,7 @@ main {
 
 .grid-sidebar {
     grid-column: 1;
-    padding: 1rem;
+    padding: 0.5rem 0.75rem;
     border-bottom: 1px solid var(--border-color);
     border-right: 2px solid var(--border-color);
     display: flex;
@@ -246,17 +339,17 @@ main {
 
 .staff-name {
     font-weight: 700;
-    font-size: 1.05rem;
+    font-size: 0.95rem;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
 }
 
 .staff-team {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--accent-color);
     font-weight: 600;
-    margin-top: 4px;
+    margin-top: 2px;
 }
 
 .content-area {
@@ -323,12 +416,12 @@ main {
     background: rgba(30, 41, 59, 0.7);
     backdrop-filter: blur(12px);
     border: 1px solid var(--border-color);
-    border-radius: 16px;
+    border-radius: var(--radius-xl);
     padding: 1.5rem;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    box-shadow: var(--shadow-md);
     transition: all 0.3s ease;
 }
 
@@ -444,7 +537,7 @@ main {
 .modal {
     background: var(--surface-color);
     border: 1px solid var(--border-color);
-    border-radius: 16px;
+    border-radius: var(--radius-xl);
     width: 480px;
     padding: 2.5rem;
     display: flex;
@@ -726,7 +819,9 @@ select:focus, input:focus {
     background: var(--surface-color); /* モーダル時はサーフェスカラー */
     height: 100%;
     flex-direction: column;
-    border-radius: 16px;
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
 }
 
 /* 別ウィンドウ表示（bodyにpj-view-activeがある時）はBGカラーにし、全画面にする */
@@ -765,7 +860,7 @@ select:focus, input:focus {
     gap: 1.25rem;
     background: rgba(255, 255, 255, 0.03);
     padding: 1.25rem;
-    border-radius: 16px;
+    border-radius: var(--radius-xl);
     border: 1px solid var(--border-color);
 }
 
@@ -841,7 +936,7 @@ select:focus, input:focus {
     flex: 1;
     overflow: auto;
     border: 1px solid var(--border-color);
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
     background: var(--surface-color);
     margin-top: 1rem;
 }
@@ -873,38 +968,7 @@ select:focus, input:focus {
 .paste-area:hover { background: rgba(99, 102, 241, 0.1); }
 .paste-area textarea { position: absolute; opacity: 0; pointer-events: none; }
 
-/* --- Drag & Drop Overlay (v2.60) --- */
-.drop-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.85);
-    backdrop-filter: blur(12px);
-    z-index: 5000;
-    display: none; /* JSで制御 */
-    justify-content: center;
-    align-items: center;
-    border: 4px dashed var(--accent-color);
-    margin: 20px;
-    border-radius: 24px;
-    pointer-events: none; /* 貫通させる */
-}
 
-.drop-overlay.active {
-    display: flex;
-    animation: fadeIn 0.3s ease;
-}
-
-.drop-message {
-    text-align: center;
-    color: white;
-    transform: translateY(0);
-    animation: bounceIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-@keyframes bounceIn {
-    from { opacity: 0; transform: scale(0.8) translateY(20px); }
-    to { opacity: 1; transform: scale(1) translateY(0); }
-}
 
 /* --- Stats Area (v2.90) --- */
 .stats-area {
@@ -918,9 +982,9 @@ select:focus, input:focus {
 .stats-card {
     background: var(--surface-color);
     border: 1px solid var(--border-color);
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
     padding: 1.25rem;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-sm);
     border-top: 4px solid var(--accent-color);
 }
 
@@ -985,10 +1049,10 @@ select:focus, input:focus {
     display: none; /* JSで制御 */
     justify-content: space-between;
     align-items: center;
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
     margin-bottom: 1.5rem;
     font-weight: 700;
-    box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4);
+    box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.4);
     animation: slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -1215,3 +1279,74 @@ select:focus, input:focus {
         margin: 15mm 10mm;
     }
 }
+
+/* --- 同期ステータスUI用デザイン (v4.00) --- */
+.sync-status {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    background-color: rgba(255, 255, 255, 0.05);
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid var(--border-color);
+}
+
+.sync-status i {
+    width: 14px;
+    height: 14px;
+}
+
+.sync-status.connected {
+    color: #10b981;
+    border-color: rgba(16, 185, 129, 0.3);
+    background-color: rgba(16, 185, 129, 0.1);
+}
+
+.sync-status.locked {
+    color: #f59e0b;
+    border-color: rgba(245, 158, 11, 0.3);
+    background-color: rgba(245, 158, 11, 0.1);
+}
+
+.sync-status.error {
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.3);
+    background-color: rgba(239, 68, 68, 0.1);
+}
+
+#quick-sync-btn {
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+    background-color: rgba(99, 102, 241, 0.1);
+}
+
+#quick-sync-btn:hover {
+    background-color: rgba(99, 102, 241, 0.2);
+}
+
+.toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: var(--surface-color);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    padding: 0.75rem 1.25rem;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 9999;
+    transform: translateY(100px);
+    opacity: 0;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s;
+}
+
+.toast.show {
+    transform: translateY(0);
+    opacity: 1;
+}
+

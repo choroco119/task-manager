@@ -29,20 +29,6 @@ const app = {
             .replace(/'/g, '&#39;');
     },
 
-    // ファイルドロップかどうかを判定する共通関数
-    isFileDrag(e) {
-        if (!e.dataTransfer) return false;
-        // ドラッグ終了後や一部ブラウザでは dataTransfer.files が空になることがあるため types も併用
-        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) return true;
-        if (e.dataTransfer.types) {
-            for (let i = 0; i < e.dataTransfer.types.length; i++) {
-                const t = e.dataTransfer.types[i].toLowerCase();
-                if (t === 'files' || t === 'application/x-moz-file') return true;
-            }
-        }
-        return false;
-    },
-
     // 工数解析ヘルパー 
     parseManHours(str) {
         if (!str) return 0;
@@ -56,7 +42,7 @@ const app = {
         return n ? parseFloat(n[0]) : 0;
     },
 
-    init() {
+    async init() {
         // モード判定
         const params = new URLSearchParams(window.location.search);
         if (params.get('mode') === 'pj') {
@@ -67,20 +53,24 @@ const app = {
             window.name = 'MainProcessManager';
         }
 
-        this.loadConfig();
         this.setInitialWeek();
         this.render();
-        this.initDragAndDrop();
+
+        // 同期ボタンのイベントリスナー設定
+        this.setupSyncEvents();
+
+        // File System Access API の接続
+        if (window.showDirectoryPicker) {
+            await SyncManager.checkStoredFolder();
+            SyncManager.startAutoSync();
+        } else {
+            SyncManager.updateSyncStatusUI('error');
+        }
 
         // 別ウィンドウ同期
         window.addEventListener('storage', (e) => {
-            if (e.key === 'scheduler_app_state') {
-                this.loadConfig();
-                this.render();
-            }
             // 別窓からの選択信号 
             if (e.key === 'pj_select_signal' && e.newValue) {
-                this.loadConfig();
                 this.selectPjFromSub(e.newValue);
             }
         });
@@ -89,27 +79,40 @@ const app = {
         window.addEventListener('contextmenu', e => e.preventDefault());
     },
 
-    saveConfig() {
-        this.validateIntegrity();
-        localStorage.setItem('scheduler_app_state', JSON.stringify(this.state));
-    },
+    setupSyncEvents() {
+        const syncFolderBtn = document.getElementById('sync-folder-btn');
+        const quickSyncBtn = document.getElementById('quick-sync-btn');
+        const saveSyncBtn = document.getElementById('save-sync-btn');
 
-    clearAllData() {
-        if (confirm('ブラウザ内に保存されているすべてのデータを削除しますか？\n（案件、スケジュール、メンバー情報がすべて消去されます。この操作は取り消せません）')) {
-            localStorage.removeItem('scheduler_app_state');
-            location.reload();
+        if (syncFolderBtn) {
+            syncFolderBtn.onclick = () => SyncManager.connectToFolder();
+        }
+        if (quickSyncBtn) {
+            quickSyncBtn.onclick = async () => {
+                const handle = await SyncManager.getStoredHandle();
+                if (handle) {
+                    await SyncManager.connectToFolder(handle);
+                }
+            };
+        }
+        if (saveSyncBtn) {
+            saveSyncBtn.onclick = async () => {
+                if (!SyncManager.dirHandle) {
+                    alert('同期フォルダが設定されていません。「同期設定」からフォルダを選択してください。');
+                    return;
+                }
+                await SyncManager.loadFromFolder();
+                SyncManager.showToast('最新データを読み込みました');
+            };
         }
     },
 
-    loadConfig() {
-        const conf = localStorage.getItem('scheduler_app_state');
-        if (conf) {
-            try {
-                Object.assign(this.state, JSON.parse(conf));
-                this.validateIntegrity();
-            } catch (e) {
-                console.error("Load Error", e);
-            }
+    async saveConfig() {
+        this.validateIntegrity();
+        
+        // 共有フォルダ同期が有効なら非同期で同期保存
+        if (SyncManager.dirHandle && !SyncManager.isSaving) {
+            await SyncManager.saveWithSync(true);
         }
     },
 
@@ -154,6 +157,7 @@ const app = {
         this.state.staff.forEach((s, idx) => {
             if (s.order === undefined) s.order = idx;
             if (s.teamId && !teamIds.has(s.teamId)) s.teamId = '';
+            if (s.workHoursPerDay === undefined) s.workHoursPerDay = 8.00;
         });
 
         // No.の振り直しとカラー設定
@@ -258,7 +262,15 @@ const app = {
         sun.setDate(mon.getDate() + 6);
         const fmt = d => `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
         const el = document.getElementById('weekRange');
-        if (el) el.textContent = `${fmt(mon)} - ${fmt(sun)}`;
+        if (el) {
+            const rangeText = `${fmt(mon)} - ${fmt(sun)}`;
+            if (SyncManager.dirHandle) {
+                const fileName = SyncManager.getWeekFileName(this.state.monday);
+                el.innerHTML = `${rangeText} <small style="font-size:0.7em; opacity:0.55; font-weight:normal;">(${fileName})</small>`;
+            } else {
+                el.textContent = rangeText;
+            }
+        }
     },
 
     toggleHoliday(dayIdx) {
@@ -276,11 +288,24 @@ const app = {
         this.render();
     },
 
-    moveWeek(n) {
+    async moveWeek(n) {
         const d = new Date(this.state.monday);
         d.setDate(d.getDate() + (n * 7));
-        this.state.monday = d.toISOString();
-        this.render();
+        d.setHours(0, 0, 0, 0);
+        const newMondayISO = d.toISOString();
+
+        if (SyncManager.dirHandle) {
+            // 同期フォルダが接続されている場合は週別ファイルで切り替え
+            const success = await SyncManager.saveCurrentWeekAndLoadNew(newMondayISO);
+            if (!success) {
+                // キャンセルされた場合は元の週のまま再描画
+                this.render();
+            }
+        } else {
+            // 未接続の場合は従来通り monday を変更して render
+            this.state.monday = newMondayISO;
+            this.render();
+        }
     },
 
     renderGrid() {
@@ -337,7 +362,10 @@ const app = {
                 <div class="grid-row">
                     <div class="grid-sidebar" id="sidebar-${s.id}">
                         <div class="staff-name">${s.isLeader ? '<span style="color:var(--leader-color)">★</span>' : ''} ${this.esc(s.name)}</div>
-                        <div class="staff-team">${this.esc(teamName)}</div>
+                        <div class="staff-team">
+                            ${this.esc(teamName)}
+                            <span style="opacity:0.6; margin-left:4px;">(${(s.workHoursPerDay !== undefined ? s.workHoursPerDay : 8.00).toFixed(2)}h/日)</span>
+                        </div>
                     </div>
                     <div class="content-area" id="content-${s.id}">
                         <div class="click-grid">
@@ -467,8 +495,8 @@ const app = {
             layer.appendChild(bar);
         });
 
-        // 行の高さを段数に合わせて動的に拡張 
-        const finalHeight = Math.max(120, (maxLv + 1) * 35 + 24);
+        // 行の高さを段数に合わせて動的に拡張 (基本は2行分の83px、常に表示段数+1行分の余裕を持たせる)
+        const finalHeight = (maxLv + 2) * 35 + 13;
         const elSide = document.getElementById(`sidebar-${sid}`);
         const elCont = document.getElementById(`content-${sid}`);
         if (elSide) elSide.style.height = `${finalHeight}px`;
@@ -773,24 +801,20 @@ const app = {
 
     // --- Drag & Drop 実装 ---
     handleDragOver(e) {
-        if (this.isFileDrag(e)) return; // ファイルドロップ時は上位(window)の処理に任せる
         e.preventDefault(); // ドロップを許可 
         e.dataTransfer.dropEffect = 'move';
     },
 
     handleDragEnter(e, el) {
-        if (this.isFileDrag(e)) return; // ファイルドロップ時はハイライトしない
         e.preventDefault();
         el.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
     },
 
     handleDragLeave(e, el) {
-        if (this.isFileDrag(e)) return;
         el.style.backgroundColor = '';
     },
 
     handleDrop(e, dayIdx, staffId) {
-        if (this.isFileDrag(e)) return; // ファイルドロップ時は上位(window)の処理に任せるため stopPropagation しない
         e.preventDefault();
         e.stopPropagation();
         
@@ -1131,7 +1155,7 @@ const app = {
         } else {
             let sorted = [...this.state.staff].sort((a, b) => a.order - b.order);
             b.innerHTML = `
-                <div class="form-g" style="display:grid;grid-template-columns:2fr 1.5fr auto;gap:15px;padding:1.5rem;background:rgba(255,255,255,0.03);border-radius:12px;margin:1rem;">
+                <div class="form-g" style="display:grid;grid-template-columns:2fr 1.5fr 1fr auto;gap:15px;padding:1.5rem;background:rgba(255,255,255,0.03);border-radius:12px;margin:1rem;">
                     <div><label>名前</label><input id="nsN" placeholder="氏名を入力"></div>
                     <div><label>所属チーム</label>
                         <select id="nsT">
@@ -1139,10 +1163,11 @@ const app = {
                             ${this.state.teams.map(x => `<option value="${x.id}">${x.name}</option>`).join('')}
                         </select>
                     </div>
+                    <div><label>工数/日</label><input id="nsH" type="number" step="0.25" value="8.00"></div>
                     <button class="btn btn-primary" style="align-self:end" onclick="app.addStaff()">メンバー追加</button>
                 </div>
                 <table class="m-table">
-                    <thead><tr><th>名前</th><th>所属</th><th style="width:60px">役職</th><th style="width:110px">順序</th><th style="width:60px">操作</th></tr></thead>
+                    <thead><tr><th>名前</th><th>所属</th><th style="width:90px">工数/日</th><th style="width:60px">役職</th><th style="width:110px">順序</th><th style="width:60px">操作</th></tr></thead>
                     <tbody>${sorted.map((s, idx) => `
                         <tr>
                             <td><input class="edit-field" value="${this.esc(s.name)}" oninput="app.upStaffN('${this.esc(s.id)}', this.value)"></td>
@@ -1152,6 +1177,7 @@ const app = {
                                     ${this.state.teams.map(t => `<option value="${this.esc(t.id)}" ${t.id === s.teamId ? 'selected' : ''}>${this.esc(t.name)}</option>`).join('')}
                                 </select>
                             </td>
+                            <td><input class="edit-field" style="text-align:right" type="number" step="0.25" value="${(s.workHoursPerDay !== undefined ? s.workHoursPerDay : 8.00).toFixed(2)}" onchange="app.upStaffH('${this.esc(s.id)}', this.value)"></td>
                             <td><button class="btn btn-icon ${s.isLeader ? 'btn-primary' : ''}" onclick="app.toggleL('${this.esc(s.id)}')">${s.isLeader ? '★' : '通常'}</button></td>
                             <td>
                                 <div style="display:flex;gap:4px;">
@@ -1188,14 +1214,32 @@ const app = {
     addStaff() {
         const n = document.getElementById('nsN').value;
         const t = document.getElementById('nsT').value;
+        const hVal = document.getElementById('nsH').value;
         if (n) {
+            const h = parseFloat(hVal);
+            const workHours = isNaN(h) ? 8.00 : parseFloat((Math.round(h * 4) / 4).toFixed(2));
             const maxOrder = this.state.staff.reduce((m, s) => Math.max(m, s.order || 0), -1);
-            this.state.staff.push({ id: 's' + Date.now(), teamId: t, name: n, isLeader: false, order: maxOrder + 1 });
+            this.state.staff.push({ 
+                id: 's' + Date.now(), 
+                teamId: t, 
+                name: n, 
+                isLeader: false, 
+                order: maxOrder + 1,
+                workHoursPerDay: workHours
+            });
             this.renderMemberBody('staff');
             this.render();
         }
     },
     upStaffN(id, v) { this.state.staff.find(s => s.id === id).name = v; this.render(); },
+    upStaffH(id, v) {
+        const val = parseFloat(v);
+        const s = this.state.staff.find(x => x.id === id);
+        if (s) {
+            s.workHoursPerDay = isNaN(val) ? 8.00 : parseFloat((Math.round(val * 4) / 4).toFixed(2));
+            this.render();
+        }
+    },
     upStT(sid, tid) { this.state.staff.find(s => s.id === sid).teamId = tid; this.render(); },
     toggleL(sid) { const s = this.state.staff.find(x => x.id === sid); s.isLeader = !s.isLeader; this.renderMemberBody('staff'); this.render(); },
     delStaff(id) { if (confirm('メンバーを削除しますか？')) { this.state.staff = this.state.staff.filter(s => s.id !== id); this.validateIntegrity(); this.render(); this.renderMemberBody('staff'); } },
@@ -1636,103 +1680,12 @@ const app = {
 
     // --- その他 ---
     hideModal(id) { document.getElementById(id).style.display = 'none'; },
-    exportData() {
-        const mon = new Date(this.state.monday);
-        const sun = new Date(mon);
-        sun.setDate(mon.getDate() + 6);
-        
-        const pad = (n) => n.toString().padStart(2, '0');
-        const f = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
-        
-        const fn = `工程データ(${f(mon)}-${f(sun)}).json`;
-        const blob = new Blob([JSON.stringify(this.state, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fn;
-        a.click();
-    },
     print() {
         // 印刷前に製番リストを最新状態にする（もし隠れていてもデータがあればレンダリングする）
         if (this.state.projects.length > 0) {
             this.renderProjectBody();
         }
         window.print();
-    },
-    // 共通データ反映処理 (v2.60)
-    applyData(jsonText) {
-        try {
-            const data = JSON.parse(jsonText);
-
-            // 基本的な構造チェック
-            if (!data || typeof data !== 'object') throw new Error("Invalid Data Format");
-
-            // 既存のstateにマージする前に中身を正規化
-            Object.assign(this.state, {
-                teams: Array.isArray(data.teams) ? data.teams : [],
-                staff: Array.isArray(data.staff) ? data.staff : [],
-                projects: Array.isArray(data.projects) ? data.projects : [],
-                deletedProjects: Array.isArray(data.deletedProjects) ? data.deletedProjects : [],
-                tags: Array.isArray(data.tags) ? data.tags : [],
-                schedule: Array.isArray(data.schedule) ? data.schedule : [],
-                holidays: Array.isArray(data.holidays) ? data.holidays : [],
-                specialItems: Array.isArray(data.specialItems) ? data.specialItems : this.state.specialItems,
-                monday: data.monday || this.state.monday,
-                team: data.team || 'all'
-            });
-
-            this.validateIntegrity();
-            this.render();
-            alert('データの読み込みが完了しました');
-        } catch (e) {
-            console.error("Apply Data Error", e);
-            alert('データ形式が正しくありません。');
-        }
-    },
-
-    // ドラッグ＆ドロップ初期化 (v2.60)
-    initDragAndDrop() {
-        const overlay = document.getElementById('dropOverlay');
-        if (!overlay) return;
-
-        window.addEventListener('dragenter', (e) => {
-            if (this.isFileDrag(e)) {
-                e.preventDefault();
-                overlay.classList.add('active');
-            }
-        });
-
-        window.addEventListener('dragover', (e) => {
-            if (this.isFileDrag(e)) {
-                e.preventDefault();
-                if (!overlay.classList.contains('active')) overlay.classList.add('active');
-            }
-        });
-
-        window.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            // 子要素からの離脱を無視するため、relatedTargetをチェック
-            if (!e.relatedTarget) {
-                overlay.classList.remove('active');
-            }
-        });
-
-        window.addEventListener('drop', async (e) => {
-            // もしファイルドロップ用のオーバーレイが出ていた場合は消す
-            overlay.classList.remove('active');
-            
-            // ファイルのドロップでなければ何もしない
-            if (!this.isFileDrag(e)) return;
-
-            e.preventDefault();
-            const file = e.dataTransfer.files[0];
-            if (file && (file.type === "application/json" || file.name.endsWith('.json'))) {
-                const text = await file.text();
-                this.applyData(text);
-            } else {
-                alert('JSONファイルをドロップしてください。');
-            }
-        });
     }
 };
 
